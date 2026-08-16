@@ -152,6 +152,25 @@ export function locateSourceSpan(
   );
 }
 
+export function locateUniqueExcerptSpans(
+  article: CanonicalArticle,
+  excerpt: string,
+): SourceSpan[] {
+  if (!excerpt) {
+    return [];
+  }
+
+  const spans: SourceSpan[] = [];
+  for (const field of ["title", "body"] as const) {
+    const text = fieldText(article, field);
+    const matches = findAllExact(text, excerpt);
+    if (matches.length === 1) {
+      spans.push(assertSliceEqualsQuotedText(text, toSpan(article, field, matches[0])));
+    }
+  }
+  return spans;
+}
+
 export function assertSliceEqualsQuotedText(
   text: string,
   span: SourceSpan,

@@ -169,6 +169,10 @@ body {
   color: inherit;
 }
 
+.finding-card-select {
+  cursor: pointer;
+}
+
 .finding-card.is-selected {
   border-color: var(--ink);
   box-shadow: 0 0 0 1px var(--ink);
@@ -220,6 +224,56 @@ body {
 
 .finding-quote {
   color: var(--muted);
+}
+
+.finding-unsafe {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--high);
+}
+
+.status-pill {
+  font-size: 12px;
+}
+
+.status-pill.status-verify {
+  color: var(--high);
+}
+
+.status-pill.status-accepted {
+  color: #027a48;
+}
+
+.status-pill.status-invalidated,
+.status-pill.status-ignored {
+  color: var(--muted);
+}
+
+.finding-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-button {
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.review-complete,
+.action-error {
+  margin: 0;
+  padding: 10px 24px;
 }
 
 .finding-empty {

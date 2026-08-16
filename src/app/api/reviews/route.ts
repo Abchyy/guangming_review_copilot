@@ -1,4 +1,5 @@
 import {
+  ReviewDomainError,
   ReviewProviderError,
   ReviewRequestError,
   createReviewRequestSchema,
@@ -6,10 +7,31 @@ import {
 import { createReviewModelFromEnv } from "@/lib/server/llm/create-review-model";
 import type { ReviewModel } from "@/lib/server/llm/review-model";
 import { createReview } from "@/lib/server/review-service";
+import { ReviewStore } from "@/lib/server/review-store";
+import { getReviewStore } from "@/lib/server/store-singleton";
 
 export const maxDuration = 60;
 
-export function createReviewPostHandler(model: ReviewModel) {
+function errorResponse(error: unknown): Response {
+  if (error instanceof ReviewRequestError) {
+    return Response.json({ error: error.message }, { status: error.status });
+  }
+  if (error instanceof ReviewProviderError) {
+    return Response.json({ error: error.message }, { status: error.status });
+  }
+  if (error instanceof ReviewDomainError) {
+    return Response.json(
+      { code: error.code, error: error.message },
+      { status: error.status },
+    );
+  }
+  return Response.json({ error: "Internal review error" }, { status: 500 });
+}
+
+export function createReviewPostHandler(
+  model: ReviewModel,
+  store: ReviewStore = getReviewStore(),
+) {
   return async function POST(request: Request): Promise<Response> {
     let json: unknown;
     try {
@@ -31,15 +53,13 @@ export function createReviewPostHandler(model: ReviewModel) {
 
     try {
       const result = await createReview(parsed.data, model);
+      store.insertCreatedReview(result, {
+        title: result.article.title,
+        body: result.article.body,
+      });
       return Response.json(result);
     } catch (error) {
-      if (error instanceof ReviewRequestError) {
-        return Response.json({ error: error.message }, { status: error.status });
-      }
-      if (error instanceof ReviewProviderError) {
-        return Response.json({ error: error.message }, { status: error.status });
-      }
-      return Response.json({ error: "Internal review error" }, { status: 500 });
+      return errorResponse(error);
     }
   };
 }

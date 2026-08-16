@@ -11,9 +11,14 @@ const validOutput = {
       severity: "low",
       title: "错别字",
       reason: "测试",
-      suggestion: "座谈会",
+      suggestion: {
+        text: "座谈会",
+        replacement: "座谈会",
+      },
       confidence: 0.9,
-      evidence: { type: "ai_judgment", summary: "测试", items: [] },
+      evidence: [
+        { kind: "ai_judgment", excerpt: "测试", citation_validated: false },
+      ],
       source: {
         field: "body",
         exact_quote: "座谈谈会",

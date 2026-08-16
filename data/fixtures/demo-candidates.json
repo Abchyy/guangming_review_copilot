@@ -5,13 +5,18 @@
       "severity": "low",
       "title": "“座谈会”疑似多字",
       "reason": "正文将“座谈会”写成“座谈谈会”，疑似多字，属于基础文字错误。",
-      "suggestion": "座谈会",
-      "confidence": 0.93,
-      "evidence": {
-        "type": "ai_judgment",
-        "summary": "常见会议名称应为“座谈会”。",
-        "items": []
+      "suggestion": {
+        "text": "改为“座谈会”。",
+        "replacement": "座谈会"
       },
+      "confidence": 0.93,
+      "evidence": [
+        {
+          "kind": "ai_judgment",
+          "excerpt": "常见会议名称应为“座谈会”。",
+          "citation_validated": false
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "座谈谈会",
@@ -25,13 +30,18 @@
       "severity": "medium",
       "title": "星期与日期可能不符",
       "reason": "稿件写“上周四（8月12日）”。若报道基准为2026年8月，8月12日是星期三，不是星期四，建议核实。",
-      "suggestion": "上周三（8月12日）",
-      "confidence": 0.72,
-      "evidence": {
-        "type": "ai_judgment",
-        "summary": "星期与公历日期可能不一致，建议人工核对报道基准日。",
-        "items": []
+      "suggestion": {
+        "text": "若基准日无误，改为“上周三（8月12日）”。",
+        "replacement": "上周三（8月12日）"
       },
+      "confidence": 0.72,
+      "evidence": [
+        {
+          "kind": "ai_judgment",
+          "excerpt": "星期与公历日期可能不一致，建议人工核对报道基准日。",
+          "citation_validated": false
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "上周四（8月12日）",
@@ -45,13 +55,18 @@
       "severity": "low",
       "title": "句中缺少句读",
       "reason": "“根本任务”与“推动义务教育优质均衡发展”之间缺少句号或逗号，阅读停顿不清。",
-      "suggestion": "要把立德树人作为教育的根本任务，推动义务教育优质均衡发展",
-      "confidence": 0.84,
-      "evidence": {
-        "type": "ai_judgment",
-        "summary": "两分句连写，缺少标点。",
-        "items": []
+      "suggestion": {
+        "text": "在“根本任务”后补逗号。",
+        "replacement": "要把立德树人作为教育的根本任务，推动义务教育优质均衡发展"
       },
+      "confidence": 0.84,
+      "evidence": [
+        {
+          "kind": "ai_judgment",
+          "excerpt": "两分句连写，缺少标点。",
+          "citation_validated": false
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "要把立德树人作为教育的根本任务推动义务教育优质均衡发展",
@@ -65,22 +80,23 @@
       "severity": "high",
       "title": "在校生人数前后冲突",
       "reason": "前文通报全市义务教育阶段在校生共128万人，后文又称182万人，文内数据不一致。",
-      "suggestion": null,
-      "confidence": 0.96,
-      "evidence": {
-        "type": "internal_context",
-        "summary": "同一事实在文中出现两个不同数字。",
-        "items": [
-          {
-            "label": "前文",
-            "text": "全市义务教育阶段在校生共128万人"
-          },
-          {
-            "label": "后文",
-            "text": "全市义务教育阶段在校生共182万人"
-          }
-        ]
+      "suggestion": {
+        "text": "建议人工核实，无安全自动替换。",
+        "replacement": null
       },
+      "confidence": 0.96,
+      "evidence": [
+        {
+          "kind": "internal_context",
+          "excerpt": "全市义务教育阶段在校生共128万人",
+          "citation_validated": true
+        },
+        {
+          "kind": "internal_context",
+          "excerpt": "全市义务教育阶段在校生共182万人",
+          "citation_validated": true
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "全市义务教育阶段在校生共128万人",
@@ -94,22 +110,23 @@
       "severity": "high",
       "title": "后文在校生人数与前文不一致",
       "reason": "后文写182万人，与前面的128万人冲突，发布前必须核对哪一个数字正确。",
-      "suggestion": null,
-      "confidence": 0.96,
-      "evidence": {
-        "type": "internal_context",
-        "summary": "后文数字与前文冲突。",
-        "items": [
-          {
-            "label": "前文",
-            "text": "全市义务教育阶段在校生共128万人"
-          },
-          {
-            "label": "后文",
-            "text": "全市义务教育阶段在校生共182万人"
-          }
-        ]
+      "suggestion": {
+        "text": "建议人工核实，无安全自动替换。",
+        "replacement": null
       },
+      "confidence": 0.96,
+      "evidence": [
+        {
+          "kind": "internal_context",
+          "excerpt": "全市义务教育阶段在校生共128万人",
+          "citation_validated": true
+        },
+        {
+          "kind": "internal_context",
+          "excerpt": "全市义务教育阶段在校生共182万人",
+          "citation_validated": true
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "全市义务教育阶段在校生共182万人",
@@ -123,22 +140,23 @@
       "severity": "medium",
       "title": "主办单位名称可能不准确",
       "reason": "前文称市教育局召开座谈会，后文写由“市教育委员会”主办。二者可能不是同一机构名称，建议核对官方全称。",
-      "suggestion": "市教育局",
-      "confidence": 0.74,
-      "evidence": {
-        "type": "internal_context",
-        "summary": "同一稿件中出现市教育局与市教育委员会两种机构名称。",
-        "items": [
-          {
-            "label": "前文",
-            "text": "市教育局党委书记、局长王海涛"
-          },
-          {
-            "label": "后文",
-            "text": "本次座谈会由市教育委员会主办"
-          }
-        ]
+      "suggestion": {
+        "text": "若主办单位确为市教育局，改为“市教育局”。",
+        "replacement": "市教育局"
       },
+      "confidence": 0.74,
+      "evidence": [
+        {
+          "kind": "internal_context",
+          "excerpt": "市教育局党委书记、局长王海涛",
+          "citation_validated": true
+        },
+        {
+          "kind": "internal_context",
+          "excerpt": "本次座谈会由市教育委员会主办",
+          "citation_validated": true
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "市教育委员会",
@@ -152,13 +170,18 @@
       "severity": "high",
       "title": "文件名称年份可能有误",
       "reason": "稿件写《教育强国建设规划纲要（2023－2035年）》。公开文件名称通常为2024－2035年，建议核对正式文件名，不要自行改写。",
-      "suggestion": "《教育强国建设规划纲要（2024－2035年）》",
-      "confidence": 0.8,
-      "evidence": {
-        "type": "ai_judgment",
-        "summary": "重要文件名称疑似年份错误；当前没有检索依据，建议人工核对。",
-        "items": []
+      "suggestion": {
+        "text": "核对后可改为《教育强国建设规划纲要（2024－2035年）》。",
+        "replacement": "《教育强国建设规划纲要（2024－2035年）》"
       },
+      "confidence": 0.8,
+      "evidence": [
+        {
+          "kind": "ai_judgment",
+          "excerpt": "重要文件名称疑似年份错误；当前没有检索依据，建议人工核对。",
+          "citation_validated": false
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "《教育强国建设规划纲要（2023－2035年）》",
@@ -172,22 +195,23 @@
       "severity": "critical",
       "title": "总结发言人物可能张冠李戴",
       "reason": "前文出席并讲话的是市教育局局长王海涛，后文突然出现“王强在总结时强调”，未交代王强身份，也未说明是否另有其人，存在人物错误风险。",
-      "suggestion": "王海涛在总结时强调",
-      "confidence": 0.88,
-      "evidence": {
-        "type": "internal_context",
-        "summary": "出席领导为王海涛，总结发言却写成王强。",
-        "items": [
-          {
-            "label": "前文",
-            "text": "市教育局党委书记、局长王海涛出席会议并讲话"
-          },
-          {
-            "label": "后文",
-            "text": "王强在总结时强调"
-          }
-        ]
+      "suggestion": {
+        "text": "若总结发言人仍是王海涛，改为“王海涛在总结时强调”。",
+        "replacement": "王海涛在总结时强调"
       },
+      "confidence": 0.88,
+      "evidence": [
+        {
+          "kind": "internal_context",
+          "excerpt": "市教育局党委书记、局长王海涛出席会议并讲话",
+          "citation_validated": true
+        },
+        {
+          "kind": "internal_context",
+          "excerpt": "王强在总结时强调",
+          "citation_validated": true
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "王强在总结时强调",
@@ -201,18 +225,18 @@
       "severity": "high",
       "title": "引语归属可能错误",
       "reason": "原文先写基层校长说“要把安全工作放在首位”，随即又说文中将该表述写成王海涛局长的讲话，存在引语张冠李戴风险，建议人工核实发言人。",
-      "suggestion": null,
-      "confidence": 0.7,
-      "evidence": {
-        "type": "internal_context",
-        "summary": "同一句话被同时归属给校长与局长。",
-        "items": [
-          {
-            "label": "原文",
-            "text": "一位基层校长说：“要把安全工作放在首位。”"
-          }
-        ]
+      "suggestion": {
+        "text": "建议人工核实，无安全自动替换。",
+        "replacement": null
       },
+      "confidence": 0.7,
+      "evidence": [
+        {
+          "kind": "internal_context",
+          "excerpt": "一位基层校长说：“要把安全工作放在首位。”",
+          "citation_validated": true
+        }
+      ],
       "source": {
         "field": "body",
         "exact_quote": "一位基层校长说：“要把安全工作放在首位。”",

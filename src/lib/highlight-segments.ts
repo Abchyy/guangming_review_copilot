@@ -1,4 +1,5 @@
 import type { Finding, Severity } from "@/lib/contracts/review";
+import { isUnresolvedStatus } from "@/lib/contracts/review";
 
 export type TextSegment = {
   start: number;
@@ -31,6 +32,7 @@ export function segmentField(
 ): TextSegment[] {
   const relevant = findings.filter(
     (finding) =>
+      isUnresolvedStatus(finding.status) &&
       finding.source_span.field === field &&
       finding.source_span.start_offset >= 0 &&
       finding.source_span.end_offset <= text.length &&

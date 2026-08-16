@@ -23,10 +23,10 @@ function spanFinding(
     },
     title: id,
     reason: "overlap",
-    suggestion: null,
+    suggestion: { text: "x", replacement: "x" },
     confidence: 0.5,
-    evidence: { type: "ai_judgment", summary: "test", items: [] },
-    status: "open",
+    evidence: [{ kind: "ai_judgment", excerpt: "test", citation_validated: false }],
+    status: "pending",
   };
 }
 

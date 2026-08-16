@@ -2,23 +2,29 @@
 
 import { useState } from "react";
 
-import type { CreateReviewResponse } from "@/lib/contracts/review";
+import type { CreateReviewResponse, FindingAction } from "@/lib/contracts/review";
+import { createReviewResponseSchema } from "@/lib/contracts/review";
 import { ArticleDocument } from "@/components/review/ArticleDocument";
 import { FindingList } from "@/components/review/FindingList";
+import { selectAfterDecision, unresolvedFindings } from "@/lib/review-selection";
 
 type DesktopReviewLayoutProps = {
   review: CreateReviewResponse;
+  onReviewChange: (review: CreateReviewResponse) => void;
   onReset: () => void;
 };
 
 export function DesktopReviewLayout({
   review,
+  onReviewChange,
   onReset,
 }: DesktopReviewLayoutProps) {
-  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(
+  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
+  const [pendingActionFindingId, setPendingActionFindingId] = useState<string | null>(
     null,
   );
-  const [focusNonce, setFocusNonce] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   function selectFromArticle(findingId: string) {
     setSelectedFindingId(findingId);
@@ -29,6 +35,50 @@ export function DesktopReviewLayout({
     setFocusNonce((value) => value + 1);
   }
 
+  async function decide(findingId: string, action: FindingAction) {
+    const previous = review;
+    setPendingActionFindingId(findingId);
+    setActionError(null);
+    try {
+      const response = await fetch(
+        `/api/reviews/${review.review_id}/findings/${findingId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            expected_article_version: review.article.version,
+            action_id: crypto.randomUUID(),
+          }),
+        },
+      );
+      const json: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof json === "object" &&
+          json !== null &&
+          "error" in json &&
+          typeof json.error === "string"
+            ? json.error
+            : "操作失败";
+        throw new Error(message);
+      }
+      const next = createReviewResponseSchema.parse(json);
+      onReviewChange(next);
+      const nextSelected = selectAfterDecision(selectedFindingId, previous, next);
+      setSelectedFindingId(nextSelected);
+      if (nextSelected && nextSelected !== selectedFindingId) {
+        setFocusNonce((value) => value + 1);
+      }
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "操作失败");
+    } finally {
+      setPendingActionFindingId(null);
+    }
+  }
+
+  const unresolvedCount = unresolvedFindings(review.findings).length;
+
   return (
     <div className="review-shell" data-testid="desktop-review">
       <header className="review-header">
@@ -38,19 +88,26 @@ export function DesktopReviewLayout({
         </div>
         <div className="review-header-meta">
           <span data-testid="finding-count">
-            发现 {review.findings.length} 个问题
+            发现 {review.findings.length} 个问题 · 待处理 {unresolvedCount}
           </span>
           <span className="pipeline-meta">
-            {review.pipeline.provider}
-            {review.pipeline.dropped_count > 0
-              ? ` · 未定位 ${review.pipeline.dropped_count}`
-              : ""}
+            v{review.article.version} · {review.pipeline.provider}
           </span>
           <button type="button" className="ghost-button" onClick={onReset}>
             重新审校
           </button>
         </div>
       </header>
+      {unresolvedCount === 0 ? (
+        <p className="review-complete" data-testid="review-complete">
+          本轮待处理问题已完成。
+        </p>
+      ) : null}
+      {actionError ? (
+        <p className="form-error action-error" data-testid="action-error">
+          {actionError}
+        </p>
+      ) : null}
       <div className="review-columns">
         <section className="review-pane review-pane-article">
           <ArticleDocument
@@ -65,7 +122,11 @@ export function DesktopReviewLayout({
           <FindingList
             findings={review.findings}
             selectedFindingId={selectedFindingId}
+            pendingActionFindingId={pendingActionFindingId}
             onSelectFinding={selectFromList}
+            onDecide={(findingId, action) => {
+              void decide(findingId, action);
+            }}
           />
         </aside>
       </div>

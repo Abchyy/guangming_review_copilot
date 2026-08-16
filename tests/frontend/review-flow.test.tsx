@@ -28,14 +28,15 @@ function finding(
     },
     title: extras?.title ?? `问题 ${id}`,
     reason: extras?.reason ?? "测试原因",
-    suggestion: extras?.suggestion ?? quote,
-    confidence: extras?.confidence ?? 0.9,
-    evidence: extras?.evidence ?? {
-      type: "ai_judgment",
-      summary: "测试依据",
-      items: [],
+    suggestion: extras?.suggestion ?? {
+      text: quote,
+      replacement: extras?.suggestion?.replacement ?? quote,
     },
-    status: "open",
+    confidence: extras?.confidence ?? 0.9,
+    evidence: extras?.evidence ?? [
+      { kind: "ai_judgment", excerpt: "测试依据", citation_validated: false },
+    ],
+    status: extras?.status ?? "pending",
   };
 }
 
@@ -68,13 +69,13 @@ const review: CreateReviewResponse = {
   },
 };
 
-function Harness() {
-  const [resetCount, setResetCount] = useState(0);
+function Harness({ initial = review }: { initial?: CreateReviewResponse }) {
+  const [current, setCurrent] = useState(initial);
   return (
     <DesktopReviewLayout
-      key={resetCount}
-      review={review}
-      onReset={() => setResetCount((value) => value + 1)}
+      review={current}
+      onReviewChange={setCurrent}
+      onReset={() => setCurrent(initial)}
     />
   );
 }
@@ -92,6 +93,8 @@ describe("desktop vertical slice mapping", () => {
     expect(screen.getAllByTestId("source-mark").length).toBeGreaterThan(0);
     expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
     expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
+    expect(screen.getByTestId("finding-finding-002").textContent).toContain("Critical");
+    expect(screen.getByTestId("finding-finding-001").textContent).toContain("测试依据");
   });
 
   test("clicking a highlight selects the corresponding finding", async () => {
@@ -121,10 +124,131 @@ describe("desktop vertical slice mapping", () => {
     render(
       <DesktopReviewLayout
         review={{ ...review, findings: [], pipeline: { ...review.pipeline, located_count: 0 } }}
+        onReviewChange={() => undefined}
         onReset={() => undefined}
       />,
     );
     expect(screen.getByTestId("article-body").textContent).toContain("第一段有错别字座谈谈会。");
     expect(screen.getByTestId("finding-empty").textContent).toContain("未发现需要提示的问题");
+  });
+});
+
+describe("desktop review workflow", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    vi.restoreAllMocks();
+  });
+
+  test("null replacement disables Accept", () => {
+    const unsafe = {
+      ...review,
+      findings: [
+        finding("finding-001", "座谈谈会", {
+          suggestion: { text: "建议人工核实", replacement: null },
+        }),
+      ],
+    };
+    render(<Harness initial={unsafe} />);
+    expect((screen.getByTestId("accept-finding-001") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("no-safe-replacement-finding-001")).toBeTruthy();
+    expect((screen.getByTestId("ignore-finding-001") as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByTestId("verify-finding-001") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test("Accept replaces the article from the server snapshot", async () => {
+    const user = userEvent.setup();
+    const nextReview: CreateReviewResponse = {
+      ...review,
+      article: {
+        ...review.article,
+        body: articleBody.replace("座谈谈会", "座谈会"),
+        version: 2,
+      },
+      findings: [
+        {
+          ...review.findings[0]!,
+          status: "accepted",
+          source_span: {
+            ...review.findings[0]!.source_span,
+            quoted_text: "座谈会",
+            end_offset:
+              review.findings[0]!.source_span.start_offset + "座谈会".length,
+          },
+        },
+        review.findings[1]!,
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => nextReview,
+      }),
+    );
+    render(<Harness />);
+    await user.click(screen.getByTestId("accept-finding-001"));
+    expect(screen.getByTestId("article-body").textContent).toContain("座谈会");
+    expect(screen.getByTestId("finding-finding-001").textContent).toContain("已接受");
+    expect(screen.getByTestId("finding-finding-002").className).toContain("is-selected");
+  });
+
+  test("Ignore and Verify show status without mutating article", async () => {
+    const user = userEvent.setup();
+    const ignored: CreateReviewResponse = {
+      ...review,
+      findings: [{ ...review.findings[0]!, status: "ignored" }, review.findings[1]!],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ignored,
+      }),
+    );
+    render(<Harness />);
+    const before = screen.getByTestId("article-body").textContent;
+    await user.click(screen.getByTestId("ignore-finding-001"));
+    expect(screen.getByTestId("article-body").textContent).toBe(before);
+    expect(screen.getByTestId("finding-finding-001").textContent).toContain("已忽略");
+  });
+
+  test("failed action does not mutate the article", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ code: "STALE_ARTICLE", error: "Article version mismatch" }),
+      }),
+    );
+    render(<Harness />);
+    const before = screen.getByTestId("article-body").textContent;
+    await user.click(screen.getByTestId("accept-finding-001"));
+    expect(screen.getByTestId("article-body").textContent).toBe(before);
+    expect(screen.getByTestId("action-error").textContent).toContain("Article version mismatch");
+  });
+
+  test("action loading disables buttons", async () => {
+    const user = userEvent.setup();
+    let resolveFetch: ((value: unknown) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+    render(<Harness />);
+    const click = user.click(screen.getByTestId("accept-finding-001"));
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("accept-finding-001").textContent).toContain("处理中");
+    });
+    resolveFetch?.({
+      ok: true,
+      json: async () => review,
+    });
+    await click;
   });
 });

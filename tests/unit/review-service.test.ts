@@ -9,9 +9,12 @@ const unlocatable: ReviewCandidate = {
   severity: "high",
   title: "无法定位",
   reason: "这条线索不在原文中。",
-  suggestion: null,
+  suggestion: {
+    text: "建议人工核实，无安全自动替换。",
+    replacement: null,
+  },
   confidence: 0.4,
-  evidence: { type: "ai_judgment", summary: "无", items: [] },
+  evidence: [{ kind: "ai_judgment", excerpt: "无", citation_validated: false }],
   source: {
     field: "body",
     exact_quote: "这段文字根本不存在",

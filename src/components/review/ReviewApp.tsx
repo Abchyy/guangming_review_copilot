@@ -44,7 +44,11 @@ export function ReviewApp() {
 
   if (review) {
     return (
-      <DesktopReviewLayout review={review} onReset={() => setReview(null)} />
+      <DesktopReviewLayout
+        review={review}
+        onReviewChange={setReview}
+        onReset={() => setReview(null)}
+      />
     );
   }
 
@@ -54,7 +58,7 @@ export function ReviewApp() {
         <div>
           <p className="eyebrow">Guangming Review Copilot</p>
           <h1>光明审校 Copilot</h1>
-          <p className="lede">粘贴标题与正文，开始一次桌面审校 Vertical Slice。</p>
+          <p className="lede">粘贴标题与正文，开始一次桌面审校工作流。</p>
         </div>
       </header>
       <form

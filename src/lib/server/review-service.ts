@@ -16,6 +16,7 @@ import type { ReviewModel } from "@/lib/server/llm/review-model";
 import {
   fieldText,
   locateSourceSpan,
+  locateUniqueExcerptSpans,
   assertSliceEqualsQuotedText,
 } from "@/lib/server/span-locator";
 
@@ -68,8 +69,13 @@ export async function createReview(
       reason: candidate.reason,
       suggestion: candidate.suggestion,
       confidence: candidate.confidence,
-      evidence: candidate.evidence,
-      status: "open",
+      evidence: candidate.evidence.map((item) => ({
+        kind: item.kind,
+        excerpt: item.excerpt,
+        citation_validated: item.citation_validated,
+        article_spans: locateUniqueExcerptSpans(article, item.excerpt),
+      })),
+      status: "pending",
     });
     findings.push(finding);
   }

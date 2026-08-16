@@ -12,13 +12,18 @@ const validCandidate = {
   severity: "high",
   title: "职务可能有误",
   reason: "人名与职务不匹配。",
-  suggestion: "市委书记张明",
-  confidence: 0.8,
-  evidence: {
-    type: "ai_judgment",
-    summary: "仅根据文内信息判断。",
-    items: [],
+  suggestion: {
+    text: "改为市委书记张明",
+    replacement: "市委书记张明",
   },
+  confidence: 0.8,
+  evidence: [
+    {
+      kind: "ai_judgment",
+      excerpt: "仅根据文内信息判断。",
+      citation_validated: false,
+    },
+  ],
   source: {
     field: "body",
     exact_quote: "市委书记张三",
@@ -32,7 +37,8 @@ describe("LLM candidate contract", () => {
   test("accepts valid structured output", () => {
     const parsed = parseLlmReviewOutput({ candidates: [validCandidate] });
     expect(parsed.candidates).toHaveLength(1);
-    expect(parsed.candidates[0]?.type).toBe("person");
+    expect(parsed.candidates[0]?.suggestion.replacement).toBe("市委书记张明");
+    expect(parsed.candidates[0]?.evidence[0]?.kind).toBe("ai_judgment");
   });
 
   test("rejects malformed output", () => {
@@ -95,5 +101,17 @@ describe("LLM candidate contract", () => {
         ],
       }).success,
     ).toBe(false);
+  });
+
+  test("allows null replacement", () => {
+    const parsed = parseLlmReviewOutput({
+      candidates: [
+        {
+          ...validCandidate,
+          suggestion: { text: "建议人工核实", replacement: null },
+        },
+      ],
+    });
+    expect(parsed.candidates[0]?.suggestion.replacement).toBeNull();
   });
 });
