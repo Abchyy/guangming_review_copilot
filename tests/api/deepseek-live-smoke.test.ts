@@ -1,3 +1,4 @@
+/** @vitest-environment node */
 import { describe, expect, test } from "vitest";
 
 const apiKey = process.env.DEEPSEEK_API_KEY;
