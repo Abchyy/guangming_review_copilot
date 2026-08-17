@@ -1,0 +1,79 @@
+{
+  "rule_version": "m3.1.0",
+  "default_calendar_year": 2026,
+  "typos": [
+    { "rule_id": "typo.zuotanhui", "wrong": "座谈谈会", "correct": "座谈会" },
+    { "rule_id": "typo.anzhuang", "wrong": "按装", "correct": "安装" },
+    { "rule_id": "typo.zuowei", "wrong": "做为", "correct": "作为" },
+    { "rule_id": "typo.houxuan", "wrong": "侯选", "correct": "候选" },
+    { "rule_id": "typo.dujia", "wrong": "渡假", "correct": "度假" },
+    { "rule_id": "typo.shenqingshu", "wrong": "申青书", "correct": "申请书" },
+    { "rule_id": "typo.zhanghu", "wrong": "帐号", "correct": "账号" },
+    { "rule_id": "typo.bianji", "wrong": "编缉", "correct": "编辑" }
+  ],
+  "standard_phrases": [
+    {
+      "rule_id": "std.edu-outline-2024",
+      "wrong": "《教育强国建设规划纲要（2023－2035年）》",
+      "correct": "《教育强国建设规划纲要（2024－2035年）》",
+      "type": "policy"
+    },
+    {
+      "rule_id": "std.high-quality-dev",
+      "wrong": "高质量高发展",
+      "correct": "高质量发展",
+      "type": "policy"
+    }
+  ],
+  "entities": [
+    {
+      "rule_id": "entity.wanghaitao-speaker",
+      "canonical_term": "王海涛",
+      "type": "person",
+      "wrong_quotes": [
+        { "quoted": "王强在总结时强调", "replacement": "王海涛在总结时强调" }
+      ]
+    },
+    {
+      "rule_id": "entity.edu-bureau-name",
+      "canonical_term": "市教育局",
+      "type": "organization",
+      "wrong_quotes": [
+        { "quoted": "市教育委员会", "replacement": "市教育局" }
+      ]
+    },
+    {
+      "rule_id": "entity.lijianguo-mayor",
+      "canonical_term": "李建国",
+      "type": "person",
+      "wrong_quotes": [
+        { "quoted": "李建华市长", "replacement": "李建国市长" }
+      ]
+    },
+    {
+      "rule_id": "entity.health-commission",
+      "canonical_term": "省卫生健康委",
+      "type": "organization",
+      "wrong_quotes": [
+        { "quoted": "省卫生厅", "replacement": "省卫生健康委" }
+      ]
+    }
+  ],
+  "metrics": [
+    {
+      "rule_id": "metric.compulsory-enrollment",
+      "label": "义务教育阶段在校生",
+      "number_re": "(\\d+)万人"
+    },
+    {
+      "rule_id": "metric.general-budget",
+      "label": "一般公共预算收入",
+      "number_re": "(\\d+(?:\\.\\d+)?)亿元"
+    },
+    {
+      "rule_id": "metric.grain-output",
+      "label": "粮食产量",
+      "number_re": "(\\d+(?:\\.\\d+)?)万吨"
+    }
+  ]
+}

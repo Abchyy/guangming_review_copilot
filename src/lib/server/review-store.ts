@@ -143,7 +143,19 @@ export class ReviewStore {
       if (isUniqueConstraint(error)) {
         const existing = this.getAction(input.actionId);
         if (existing) {
-          return this.getReview(input.reviewId);
+          const samePayload =
+            existing.review_id === input.reviewId &&
+            existing.finding_id === input.findingId &&
+            existing.action === input.action &&
+            existing.from_article_version === input.expectedArticleVersion;
+          if (samePayload) {
+            return this.getReview(input.reviewId);
+          }
+          throw new ReviewDomainError(
+            409,
+            "ACTION_CONFLICT",
+            "action_id already used with a different payload",
+          );
         }
       }
       throw new ReviewDomainError(503, "STORAGE_FAILURE", "Failed to persist decision");
@@ -153,10 +165,19 @@ export class ReviewStore {
   private applyDecisionInsideTransaction(input: ApplyDecisionInput): CreateReviewResponse {
     const existingAction = this.getAction(input.actionId);
     if (existingAction) {
-      if (existingAction.review_id !== input.reviewId || existingAction.finding_id !== input.findingId) {
-        throw new ReviewDomainError(422, "INVALID_STATUS_TRANSITION", "action_id already used");
+      const samePayload =
+        existingAction.review_id === input.reviewId &&
+        existingAction.finding_id === input.findingId &&
+        existingAction.action === input.action &&
+        existingAction.from_article_version === input.expectedArticleVersion;
+      if (samePayload) {
+        return this.getReview(input.reviewId);
       }
-      return this.getReview(input.reviewId);
+      throw new ReviewDomainError(
+        409,
+        "ACTION_CONFLICT",
+        "action_id already used with a different payload",
+      );
     }
 
     const row = this.getRow(input.reviewId);

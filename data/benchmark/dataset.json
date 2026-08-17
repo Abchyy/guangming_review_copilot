@@ -1,0 +1,191 @@
+{
+  "dataset_version": "m3.1.0",
+  "articles": [
+    {
+      "article_id": "dev-01",
+      "split": "dev",
+      "title": "我市召开基础教育高质量发展座谈会",
+      "body": "本报讯（记者 李明）上周四（8月12日），我市在会议中心召开基础教育高质量发展座谈谈会。市教育局党委书记、局长王海涛出席会议并讲话。\n\n王海涛指出，要把立德树人作为教育的根本任务推动义务教育优质均衡发展。会上通报，全市义务教育阶段在校生共128万人。\n\n据介绍，本次座谈会由市教育委员会主办。与会代表表示，要认真学习贯彻《教育强国建设规划纲要（2023－2035年）》。\n\n王强在总结时强调，各地要抓紧抓实秋季开学工作。\n\n另据该局日前发布的通报称，全市义务教育阶段在校生共182万人。",
+      "issues": [
+        { "issue_id": "d01-typo", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "座谈谈会", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d01-date", "type": "datetime", "severity": "high", "field": "body", "quoted_text": "上周四（8月12日）", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d01-metric-a", "type": "number", "severity": "high", "field": "body", "quoted_text": "义务教育阶段在校生共128万人", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d01-metric-b", "type": "number", "severity": "high", "field": "body", "quoted_text": "义务教育阶段在校生共182万人", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d01-org", "type": "organization", "severity": "high", "field": "body", "quoted_text": "市教育委员会", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d01-policy", "type": "policy", "severity": "high", "field": "body", "quoted_text": "《教育强国建设规划纲要（2023－2035年）》", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d01-person", "type": "person", "severity": "high", "field": "body", "quoted_text": "王强在总结时强调", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "dev-02",
+      "split": "dev",
+      "title": "社区完成监控按装",
+      "body": "社区工作人员表示，新设备已经按装到位！！一位居民说：“要把安全工作放在首位。",
+      "issues": [
+        { "issue_id": "d02-typo", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "按装", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d02-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "按装", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d02-punct", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "！！", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d02-quote", "type": "basic_text", "severity": "medium", "field": "body", "quoted_text": "“", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "dev-03",
+      "split": "dev",
+      "title": "市里召开调度会",
+      "body": "本报讯 上周四（5月4日），相关部门召开调度会，部署下一阶段工作。",
+      "issues": [
+        { "issue_id": "d03-date", "type": "datetime", "severity": "high", "field": "body", "quoted_text": "上周四（5月4日）", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "dev-04",
+      "split": "dev",
+      "title": "李建国调研民生工作",
+      "body": "市长李建国到社区调研。随后李建华市长在座谈会上听取意见。",
+      "issues": [
+        { "issue_id": "d04-person", "type": "person", "severity": "high", "field": "body", "quoted_text": "李建华市长", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "dev-05",
+      "split": "dev",
+      "title": "粮食生产保持稳定",
+      "body": "通报显示，全市粮食产量12万吨。另据年报，全市粮食产量21万吨。",
+      "issues": [
+        { "issue_id": "d05-a", "type": "number", "severity": "high", "field": "body", "quoted_text": "粮食产量12万吨", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d05-b", "type": "number", "severity": "high", "field": "body", "quoted_text": "粮食产量21万吨", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "dev-06",
+      "split": "dev",
+      "title": "平台帐号完成核验",
+      "body": "会议强调，要推动高质量高发展，并提醒居民保护好个人帐号。",
+      "issues": [
+        { "issue_id": "d06-std", "type": "policy", "severity": "high", "field": "body", "quoted_text": "高质量高发展", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d06-typo-title", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "帐号", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "d06-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "帐号", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-01",
+      "split": "locked",
+      "title": "把安全做为第一责任",
+      "body": "本报讯 上周五（10月1日），市应急管理局召开会议，强调把安全做为第一责任。",
+      "issues": [
+        { "issue_id": "l01-typo-title", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "做为", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l01-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "做为", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l01-date", "type": "datetime", "severity": "high", "field": "body", "quoted_text": "上周五（10月1日）", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-02",
+      "split": "locked",
+      "title": "公布侯选名单",
+      "body": "有关部门公布了侯选名单（第一批尚未完成审核。",
+      "issues": [
+        { "issue_id": "l02-typo", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "侯选", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l02-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "侯选", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l02-bracket", "type": "basic_text", "severity": "medium", "field": "body", "quoted_text": "（", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-03",
+      "split": "locked",
+      "title": "假期出行提醒",
+      "body": "有关方面提醒市民文明渡假。。景区将加强巡查。",
+      "issues": [
+        { "issue_id": "l03-typo", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "渡假", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l03-punct", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "。。", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-04",
+      "split": "locked",
+      "title": "提交入党申青书",
+      "body": "该同志近日提交了入党申青书，组织部门正在审核。",
+      "issues": [
+        { "issue_id": "l04-typo-title", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "申青书", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l04-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "申青书", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-05",
+      "split": "locked",
+      "title": "加强新闻编缉培训",
+      "body": "融媒体中心开展新闻编缉业务培训，强调严肃把关。",
+      "issues": [
+        { "issue_id": "l05-typo-title", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "编缉", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l05-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "编缉", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-06",
+      "split": "locked",
+      "title": "省卫生健康委通报疫情防控",
+      "body": "省卫生健康委召开调度会。会后材料误写由省卫生厅负责后续工作。",
+      "issues": [
+        { "issue_id": "l06-org", "type": "organization", "severity": "high", "field": "body", "quoted_text": "省卫生厅", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-07",
+      "split": "locked",
+      "title": "财政运行总体平稳",
+      "body": "通报称，全市一般公共预算收入30亿元。年终快报又写全市一般公共预算收入38亿元。",
+      "issues": [
+        { "issue_id": "l07-a", "type": "number", "severity": "high", "field": "body", "quoted_text": "一般公共预算收入30亿元", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l07-b", "type": "number", "severity": "high", "field": "body", "quoted_text": "一般公共预算收入38亿元", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-08",
+      "split": "locked",
+      "title": "学习规划纲要",
+      "body": "与会人员认真学习《教育强国建设规划纲要（2023－2035年）》，并结合实际谈体会。",
+      "issues": [
+        { "issue_id": "l08-policy", "type": "policy", "severity": "high", "field": "body", "quoted_text": "《教育强国建设规划纲要（2023－2035年）》", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-09",
+      "split": "locked",
+      "title": "县里召开教育工作座谈谈会",
+      "body": "日前，县教育局召开教育工作座谈谈会，研究开学安排。",
+      "issues": [
+        { "issue_id": "l09-typo-title", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "座谈谈会", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l09-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "座谈谈会", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-10",
+      "split": "locked",
+      "title": "春耕生产一线见闻",
+      "body": "本报讯 上周四（3月1日），记者在田间看到农技人员正在指导春耕。",
+      "issues": [
+        { "issue_id": "l10-date", "type": "datetime", "severity": "high", "field": "body", "quoted_text": "上周四（3月1日）", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-11",
+      "split": "locked",
+      "title": "新设备按装完成",
+      "body": "学校完成监控按装。同时通报义务教育阶段在校生共9万人，另一材料写义务教育阶段在校生共11万人。",
+      "issues": [
+        { "issue_id": "l11-typo", "type": "basic_text", "severity": "low", "field": "title", "quoted_text": "按装", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l11-typo-body", "type": "basic_text", "severity": "low", "field": "body", "quoted_text": "按装", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l11-a", "type": "number", "severity": "high", "field": "body", "quoted_text": "义务教育阶段在校生共9万人", "occurrence": 0, "requires_evidence": true },
+        { "issue_id": "l11-b", "type": "number", "severity": "high", "field": "body", "quoted_text": "义务教育阶段在校生共11万人", "occurrence": 0, "requires_evidence": true }
+      ]
+    },
+    {
+      "article_id": "lock-12",
+      "split": "locked",
+      "title": "李建国检查城市运行",
+      "body": "李建国到地铁站检查。新闻稿后段写成李建华市长提出具体要求。",
+      "issues": [
+        { "issue_id": "l12-person", "type": "person", "severity": "high", "field": "body", "quoted_text": "李建华市长", "occurrence": 0, "requires_evidence": true }
+      ]
+    }
+  ]
+}

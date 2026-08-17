@@ -1,5 +1,5 @@
-import type { Finding, Severity } from "@/lib/contracts/review";
-import { isUnresolvedStatus } from "@/lib/contracts/review";
+import { isUnresolvedStatus, type Finding, type Severity } from "@/lib/contracts/review";
+import { compareFindingsByRisk } from "@/lib/finding-rank";
 
 export type TextSegment = {
   start: number;
@@ -18,11 +18,7 @@ export const SEVERITY_RANK: Record<Severity, number> = {
 };
 
 function compareFindings(a: Finding, b: Finding): number {
-  const rankDiff = SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity];
-  if (rankDiff !== 0) {
-    return rankDiff;
-  }
-  return a.finding_id.localeCompare(b.finding_id);
+  return compareFindingsByRisk(a, b);
 }
 
 export function segmentField(

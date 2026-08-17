@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { ReviewDomainError, type ReviewCandidate } from "@/lib/contracts/review";
 import { openReviewDatabase } from "@/lib/server/db";
 import { FixtureReviewModel } from "@/lib/server/llm/fixture-review-model";
-import { createReview } from "@/lib/server/review-service";
+import { createReview, type CreateReviewOptions } from "@/lib/server/review-service";
 import { ReviewStore } from "@/lib/server/review-store";
 
 function memoryStore(): ReviewStore {
@@ -39,10 +39,12 @@ async function persistReview(
   title: string,
   body: string,
   candidates: ReviewCandidate[],
+  options?: CreateReviewOptions,
 ) {
   const snapshot = await createReview(
     { title, body },
     new FixtureReviewModel(candidates),
+    options,
   );
   store.insertCreatedReview(snapshot, snapshot.article);
   return snapshot;
@@ -348,7 +350,7 @@ describe("review store and decisions", () => {
     const created = await persistReview(store, "标题", "错误字后面", [
       candidate("错误字", "正确的字"),
       candidate("误字", "X"),
-    ]);
+    ], { promptMode: "baseline" });
     const first = created.findings.find((item) => item.source_span.quoted_text === "错误字")!;
     const overlapped = created.findings.find((item) => item.source_span.quoted_text === "误字")!;
     const after = store.applyDecision({
@@ -389,5 +391,105 @@ describe("review store and decisions", () => {
     } catch (error) {
       expect((error as ReviewDomainError).code).toBe("REVIEW_NOT_FOUND");
     }
+  });
+
+  test("applyDecision rolls back article, version, findings, and actions together", async () => {
+    const db = openReviewDatabase(":memory:");
+    const store = new ReviewStore(db);
+    const created = await persistReview(store, "标题", "abc错误def", [
+      candidate("错误", "正确"),
+    ]);
+    db.exec(
+      `CREATE TRIGGER fail_action BEFORE INSERT ON review_actions
+       BEGIN SELECT RAISE(FAIL, 'injected failure'); END;`,
+    );
+    try {
+      store.applyDecision({
+        reviewId: created.review_id,
+        findingId: created.findings[0]!.finding_id,
+        action: "accept",
+        expectedArticleVersion: 1,
+        actionId: "rollback-action",
+      });
+      throw new Error("expected failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ReviewDomainError);
+      expect((error as ReviewDomainError).code).toBe("STORAGE_FAILURE");
+    }
+    const loaded = store.getReview(created.review_id);
+    expect(loaded.article.body).toBe("abc错误def");
+    expect(loaded.article.version).toBe(1);
+    expect(loaded.findings[0]?.status).toBe("pending");
+    expect(store.getAction("rollback-action")).toBeUndefined();
+  });
+
+  test("same action_id and same payload is idempotent", async () => {
+    const store = memoryStore();
+    const created = await persistReview(store, "标题", "abc错误def", [
+      candidate("错误", "正确"),
+    ]);
+    const first = store.applyDecision({
+      reviewId: created.review_id,
+      findingId: created.findings[0]!.finding_id,
+      action: "ignore",
+      expectedArticleVersion: 1,
+      actionId: "same-payload",
+    });
+    const second = store.applyDecision({
+      reviewId: created.review_id,
+      findingId: created.findings[0]!.finding_id,
+      action: "ignore",
+      expectedArticleVersion: 1,
+      actionId: "same-payload",
+    });
+    expect(second.findings[0]?.status).toBe("ignored");
+    expect(second.article.version).toBe(first.article.version);
+  });
+
+  test("same action_id and different payload returns 409 conflict", async () => {
+    const store = memoryStore();
+    const created = await persistReview(store, "标题", "abc错误def", [
+      candidate("错误", "正确"),
+    ]);
+    store.applyDecision({
+      reviewId: created.review_id,
+      findingId: created.findings[0]!.finding_id,
+      action: "ignore",
+      expectedArticleVersion: 1,
+      actionId: "conflict-action",
+    });
+    try {
+      store.applyDecision({
+        reviewId: created.review_id,
+        findingId: created.findings[0]!.finding_id,
+        action: "accept",
+        expectedArticleVersion: 1,
+        actionId: "conflict-action",
+      });
+      throw new Error("expected failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ReviewDomainError);
+      expect((error as ReviewDomainError).code).toBe("ACTION_CONFLICT");
+      expect((error as ReviewDomainError).status).toBe(409);
+    }
+    expect(store.getReview(created.review_id).findings[0]?.status).toBe("ignored");
+    expect(store.getReview(created.review_id).article.body).toBe("abc错误def");
+  });
+
+  test("empty string replacement deletes the span", async () => {
+    const store = memoryStore();
+    const created = await persistReview(store, "标题", "abc删除这段def", [
+      candidate("删除这段", ""),
+    ]);
+    const next = store.applyDecision({
+      reviewId: created.review_id,
+      findingId: created.findings[0]!.finding_id,
+      action: "accept",
+      expectedArticleVersion: 1,
+      actionId: "delete-span",
+    });
+    expect(next.article.body).toBe("abcdef");
+    expect(next.findings[0]?.status).toBe("accepted");
+    expect(next.findings[0]?.source_span.quoted_text).toBe("");
   });
 });

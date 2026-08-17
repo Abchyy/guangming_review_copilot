@@ -52,7 +52,9 @@ export function createReviewPostHandler(
     }
 
     try {
-      const result = await createReview(parsed.data, model);
+      const result = await createReview(parsed.data, model, {
+        useCache: model.provider !== "fixture",
+      });
       store.insertCreatedReview(result, {
         title: result.article.title,
         body: result.article.body,

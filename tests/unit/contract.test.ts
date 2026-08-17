@@ -103,15 +103,15 @@ describe("LLM candidate contract", () => {
     ).toBe(false);
   });
 
-  test("allows null replacement", () => {
+  test("allows empty string replacement as span deletion", () => {
     const parsed = parseLlmReviewOutput({
       candidates: [
         {
           ...validCandidate,
-          suggestion: { text: "建议人工核实", replacement: null },
+          suggestion: { text: "删除该片段", replacement: "" },
         },
       ],
     });
-    expect(parsed.candidates[0]?.suggestion.replacement).toBeNull();
+    expect(parsed.candidates[0]?.suggestion.replacement).toBe("");
   });
 });

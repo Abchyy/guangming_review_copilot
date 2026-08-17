@@ -143,6 +143,12 @@ export function rebaseFindingsAfterAccept(options: {
     if (!quoteStillMatches(article, next.source_span)) {
       return invalidate(next);
     }
+    const evidenceMismatch = next.evidence.some((item) =>
+      (item.article_spans ?? []).some((span) => !quoteStillMatches(article, span)),
+    );
+    if (evidenceMismatch) {
+      return invalidate(next);
+    }
     return next;
   });
 }

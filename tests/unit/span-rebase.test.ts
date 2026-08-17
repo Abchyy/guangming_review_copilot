@@ -222,6 +222,42 @@ describe("span rebase", () => {
     expect(next.find((item) => item.finding_id === "b")?.status).toBe("invalidated");
   });
 
+  test("evidence spans after an edit shift and still match the new article", () => {
+    const article: CanonicalArticle = {
+      title: "T",
+      body: "abc正确的def数字",
+      version: 2,
+    };
+    const accepted = finding("a", span("body", 3, "错误"), {
+      suggestion: { text: "正确的", replacement: "正确的" },
+    });
+    const later = finding("b", span("body", 8, "数字"), {
+      evidence: [
+        {
+          kind: "internal_context",
+          excerpt: "数字",
+          citation_validated: true,
+          article_spans: [span("body", 8, "数字")],
+        },
+      ],
+    });
+    const next = rebaseFindingsAfterAccept({
+      article,
+      findings: [accepted, later],
+      acceptedFindingId: "a",
+      edit: { field: "body", start: 3, end: 5, replacementLength: 3 },
+    });
+    const rebased = next.find((item) => item.finding_id === "b");
+    expect(rebased?.status).toBe("pending");
+    expect(rebased?.source_span.start_offset).toBe(9);
+    expect(article.body.slice(9, 11)).toBe("数字");
+    const evidenceSpan = rebased?.evidence[0]?.article_spans?.[0];
+    expect(evidenceSpan?.start_offset).toBe(9);
+    expect(article.body.slice(evidenceSpan!.start_offset, evidenceSpan!.end_offset)).toBe(
+      evidenceSpan?.quoted_text,
+    );
+  });
+
   test("applyReplacement mutates the targeted field only", () => {
     const article: CanonicalArticle = { title: "错误标题", body: "abc错误def", version: 1 };
     const titleNext = applyReplacement(article, span("title", 0, "错误标题"), "正确标题");

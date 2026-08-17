@@ -30,6 +30,19 @@ CREATE TABLE IF NOT EXISTS review_actions (
   timestamp TEXT NOT NULL,
   FOREIGN KEY (review_id) REFERENCES reviews(review_id)
 );
+
+CREATE TABLE IF NOT EXISTS llm_candidate_cache (
+  cache_key TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  model TEXT,
+  prompt_version TEXT NOT NULL,
+  rule_version TEXT NOT NULL,
+  corpus_version TEXT NOT NULL,
+  output_schema_version TEXT NOT NULL,
+  article_hash TEXT NOT NULL,
+  candidates_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `;
 
 const singletons = new Map<string, Database.Database>();
