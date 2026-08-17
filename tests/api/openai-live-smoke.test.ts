@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 const apiKey = process.env.OPENAI_API_KEY;
 
-describe.skipIf(!apiKey)("OpenAI live smoke", () => {
+describe.skipIf(!apiKey)("OpenAI live smoke (benchmark-only, not production)", () => {
   test("live provider returns schema-valid candidates at least once", async () => {
     const { OpenAIReviewModel } = await import(
       "@/lib/server/llm/openai-review-model"

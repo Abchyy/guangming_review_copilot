@@ -37,7 +37,7 @@ describe("OpenAI review model", () => {
     });
     const model = new OpenAIReviewModel({
       apiKey: "sk-test",
-      model: getReviewModelName(),
+      model: getReviewModelName("openai"),
       client: { responses: { parse } } as never,
     });
 
@@ -47,13 +47,13 @@ describe("OpenAI review model", () => {
       version: 1,
     });
 
-    expect(model.model).toBe(getReviewModelName());
+    expect(model.model).toBe(getReviewModelName("openai"));
     expect(parse).toHaveBeenCalledTimes(1);
     const arg = parse.mock.calls[0]?.[0] as {
       model: string;
       text: { format: { type?: string; name?: string } };
     };
-    expect(arg.model).toBe(getReviewModelName());
+    expect(arg.model).toBe(getReviewModelName("openai"));
     expect(arg.text.format).toBeTruthy();
     expect(parseLlmReviewOutput({ candidates }).candidates).toHaveLength(1);
   });

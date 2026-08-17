@@ -1,4 +1,9 @@
-export const REVIEW_SYSTEM_PROMPT = `你是「光明审校 Copilot」的媒体审校模型，服务对象是党报、主流媒体、融媒体中心的责任编辑 / 值班编辑 / 审校人员。
+import type { ReviewPromptContext } from "@/lib/server/llm/review-model";
+
+export const PROMPT_VERSION = "m3.1.0";
+export const OUTPUT_SCHEMA_VERSION = "m3.1.0";
+
+const SHARED_SYSTEM_PROMPT = `你是「光明审校 Copilot」的媒体审校模型，服务对象是党报、主流媒体、融媒体中心的责任编辑 / 值班编辑 / 审校人员。
 
 你的任务是对新闻稿做专业审校，找出可能影响发布质量的问题，而不是改写全文，也不是做通用写作润色。
 
@@ -29,12 +34,12 @@ export const REVIEW_SYSTEM_PROMPT = `你是「光明审校 Copilot」的媒体�
 
 - 宁可漏报不确定的问题，也不要堆砌误报。
 - 没有较明确依据时，不要强行下结论。
-- 不得编造 Evidence source、规则名称、检索来源或外部网页。
-- 当前没有检索系统和规则引擎。evidence.kind 只能使用 ai_judgment 或 internal_context；不要使用 retrieved_source 或 rule。
-- 不要把猜测写成已证实事实。证据不足时，reason 应建议人工核实。
+- 不得编造 Evidence source、规则名称、检索来源、source_url 或外部网页。
+- 不要把猜测写成已证实事实。证据不足时，reason 应建议人工核实，evidence.kind 使用 ai_judgment。
 - evidence 是数组。每项必须包含 kind、excerpt、citation_validated。
 - citation_validated 仅在 excerpt 确实是当前稿件原文连续子串时为 true；否则为 false。
-- 禁止输出 offset / start_offset / end_offset / article_spans。
+- 禁止输出 offset / start_offset / end_offset / article_spans / source_url。
+- 不确定的事实不得伪装成已证实。
 
 ## 定位规则（极其重要）
 
@@ -49,29 +54,88 @@ export const REVIEW_SYSTEM_PROMPT = `你是「光明审校 Copilot」的媒体�
 
 - suggestion.text 是给人看的建议说明。
 - suggestion.replacement 是可以安全替换 exact_quote 的原文子串。
-- 只有在局部替换确定安全时，才给出非空 replacement。
+- 只有在局部替换确定安全时，才给出 replacement 字符串。
 - 若替换不安全、需要人工改写、或问题不是局部替换能解决，replacement 必须为 null。
+- 若确定应删除该 span，replacement 可以为空字符串 ""。
 - 禁止为了让 Accept 可用而编造 replacement。
 
 ## 输出
 
-- 只输出符合 schema 的结构化数据。
+- 只输出符合 schema 的 json 对象，键名为 candidates。
 - 允许 candidates 为空数组。
+- candidates 不得超过 20 条。
 - 不要输出 Markdown、解释性前言或 schema 以外的字段。`;
 
-export function buildReviewUserPrompt(title: string, body: string): string {
+const BASELINE_EVIDENCE_RULES = `## Evidence 约束
+
+- 当前是 baseline 审校：不要使用 retrieved_source 或 rule。
+- evidence.kind 只能使用 ai_judgment 或 internal_context。
+- 不得引用 source_id 或 rule_id。`;
+
+const COPILOT_EVIDENCE_RULES = `## Evidence 约束
+
+- 只能使用系统提供的 source_id / rule_id。不得编造 ID，不得输出 source_url。
+- 若引用检索来源：evidence.kind = retrieved_source，并填写系统给出的 source_id。
+- 若引用规则：evidence.kind = rule，并填写系统给出的 rule_id。
+- 若没有可靠外部依据，但你仍认为有问题：evidence.kind = ai_judgment，不要假装已证实。
+- 禁止把未提供的来源写成 retrieved_source 或 rule。`;
+
+export const REVIEW_SYSTEM_PROMPT = `${SHARED_SYSTEM_PROMPT}
+
+${COPILOT_EVIDENCE_RULES}`;
+
+export function buildReviewSystemPrompt(context: ReviewPromptContext = {}): string {
+  const mode = context.promptMode ?? "copilot";
+  const evidenceRules = mode === "baseline" ? BASELINE_EVIDENCE_RULES : COPILOT_EVIDENCE_RULES;
+  return `${SHARED_SYSTEM_PROMPT}
+
+${evidenceRules}`;
+}
+
+export function buildReviewUserPrompt(
+  title: string,
+  body: string,
+  context: ReviewPromptContext = {},
+): string {
   const numberedTitle = numberLines(title);
   const numberedBody = numberLines(body);
+  const mode = context.promptMode ?? "copilot";
 
-  return `请审校以下稿件。
+  const parts = [
+    "请审校以下稿件。",
+    "",
+    "【标题】",
+    numberedTitle,
+    "",
+    "【正文】",
+    numberedBody,
+  ];
 
-【标题】
-${numberedTitle}
+  if (mode === "copilot") {
+    const ruleHits = context.ruleHits ?? [];
+    const retrieved = context.retrievedSources ?? [];
+    parts.push("", "【可用规则 ID】");
+    if (ruleHits.length === 0) {
+      parts.push("无。不得使用 rule_id。");
+    } else {
+      for (const hit of ruleHits) {
+        parts.push(`- rule_id=${hit.rule_id}；${hit.title}；命中摘录：${hit.excerpt}`);
+      }
+    }
+    parts.push("", "【可用检索来源 ID】");
+    if (retrieved.length === 0) {
+      parts.push("无。不得使用 source_id，也不得编造 retrieved_source。");
+    } else {
+      for (const source of retrieved) {
+        parts.push(
+          `- source_id=${source.source_id}；${source.source_name}；类别=${source.category}；摘录：${source.excerpt}`,
+        );
+      }
+    }
+  }
 
-【正文】
-${numberedBody}
-
-请找出需要编辑处理的问题。exact_quote 必须从上述原文精确复制。`;
+  parts.push("", "请找出需要编辑处理的问题。exact_quote 必须从上述原文精确复制。");
+  return parts.join("\n");
 }
 
 function numberLines(text: string): string {

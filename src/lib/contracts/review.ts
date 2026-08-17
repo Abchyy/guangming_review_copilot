@@ -33,7 +33,7 @@ export const EVIDENCE_KINDS = [
   "ai_judgment",
 ] as const;
 
-export const REVIEW_PROVIDERS = ["fixture", "openai"] as const;
+export const REVIEW_PROVIDERS = ["fixture", "deepseek", "openai"] as const;
 
 export const FINDING_ACTIONS = ["accept", "ignore", "verify"] as const;
 
@@ -66,6 +66,15 @@ export const llmEvidenceItemSchema = z.object({
   kind: z.enum(EVIDENCE_KINDS),
   excerpt: z.string(),
   citation_validated: z.boolean(),
+  rule_id: z.string().min(1).optional(),
+  source_id: z.string().min(1).optional(),
+  source_url: z.string().optional(),
+});
+
+export const openaiLlmEvidenceItemSchema = z.object({
+  kind: z.enum(EVIDENCE_KINDS),
+  excerpt: z.string(),
+  citation_validated: z.boolean(),
 });
 
 export const evidenceItemSchema = z.object({
@@ -82,7 +91,7 @@ export const evidenceItemSchema = z.object({
 
 export const suggestionSchema = z.object({
   text: z.string(),
-  replacement: z.string().min(1).nullable(),
+  replacement: z.string().nullable(),
 });
 
 export const sourceCandidateSchema = z.object({
@@ -102,10 +111,27 @@ export const reviewCandidateSchema = z.object({
   confidence: z.number().min(0).max(1),
   evidence: z.array(llmEvidenceItemSchema),
   source: sourceCandidateSchema,
+  rule_id: z.string().min(1).optional(),
+  source_id: z.string().min(1).optional(),
 });
 
 export const llmReviewOutputSchema = z.object({
   candidates: z.array(reviewCandidateSchema),
+});
+
+export const openaiReviewCandidateSchema = z.object({
+  type: z.enum(FINDING_TYPES),
+  severity: z.enum(SEVERITIES),
+  title: z.string().min(1),
+  reason: z.string().min(1),
+  suggestion: suggestionSchema,
+  confidence: z.number().min(0).max(1),
+  evidence: z.array(openaiLlmEvidenceItemSchema),
+  source: sourceCandidateSchema,
+});
+
+export const openaiLlmReviewOutputSchema = z.object({
+  candidates: z.array(openaiReviewCandidateSchema),
 });
 
 export const findingSchema = z.object({
@@ -119,6 +145,7 @@ export const findingSchema = z.object({
   confidence: z.number().min(0).max(1),
   evidence: z.array(evidenceItemSchema),
   status: z.enum(FINDING_STATUSES),
+  requires_verification: z.boolean().optional(),
 });
 
 export const articleSchema = z.object({

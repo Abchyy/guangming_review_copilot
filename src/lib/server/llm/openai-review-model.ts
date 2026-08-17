@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 
 import {
-  llmReviewOutputSchema,
+  openaiLlmReviewOutputSchema,
   parseLlmReviewOutput,
   ReviewProviderError,
   type CanonicalArticle,
@@ -10,10 +10,10 @@ import {
 } from "@/lib/contracts/review";
 import { getReviewModelName } from "@/lib/server/config";
 import {
+  buildReviewSystemPrompt,
   buildReviewUserPrompt,
-  REVIEW_SYSTEM_PROMPT,
 } from "@/lib/server/llm/prompt";
-import type { ReviewModel } from "@/lib/server/llm/review-model";
+import type { ReviewModel, ReviewPromptContext } from "@/lib/server/llm/review-model";
 
 type OpenAIReviewModelOptions = {
   apiKey?: string;
@@ -32,7 +32,7 @@ export class OpenAIReviewModel implements ReviewModel {
       throw new ReviewProviderError("OPENAI_API_KEY is missing");
     }
 
-    this.model = options.model ?? getReviewModelName();
+    this.model = options.model ?? getReviewModelName("openai");
     this.client =
       options.client ??
       new OpenAI({
@@ -40,21 +40,24 @@ export class OpenAIReviewModel implements ReviewModel {
       });
   }
 
-  async review(article: CanonicalArticle): Promise<ReviewCandidate[]> {
+  async review(
+    article: CanonicalArticle,
+    context: ReviewPromptContext = {},
+  ): Promise<ReviewCandidate[]> {
     let parsed: unknown;
 
     try {
       const response = await this.client.responses.parse({
         model: this.model,
         input: [
-          { role: "system", content: REVIEW_SYSTEM_PROMPT },
+          { role: "system", content: buildReviewSystemPrompt(context) },
           {
             role: "user",
-            content: buildReviewUserPrompt(article.title, article.body),
+            content: buildReviewUserPrompt(article.title, article.body, context),
           },
         ],
         text: {
-          format: zodTextFormat(llmReviewOutputSchema, "review_candidates"),
+          format: zodTextFormat(openaiLlmReviewOutputSchema, "review_candidates"),
         },
       });
       parsed = response.output_parsed;
