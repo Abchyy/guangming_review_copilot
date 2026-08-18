@@ -1,8 +1,6 @@
 # Guangming Review Copilot / 光明审校 Copilot
 
-面向严肃媒体责任编辑的轻量化 AI 审校工具。产品方向见仓库根目录 `Guangming_Review_Copilot_Product_Freeze_v1.0.md`（已冻结，请勿修改）。
-
-当前阶段：Milestone 2 Review Workflow。
+面向严肃媒体责任编辑的轻量化 AI 审校工具。产品方向见仓库根目录 `Guangming_Review_Copilot_Product_Freeze_v1.1.md`（已冻结，请勿修改）。
 
 ## 技术基线
 
