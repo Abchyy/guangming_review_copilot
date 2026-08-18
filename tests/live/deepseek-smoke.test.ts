@@ -1,9 +1,23 @@
 /** @vitest-environment node */
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 
-const apiKey = process.env.DEEPSEEK_API_KEY;
+import {
+  LIVE_SMOKE_INTENT,
+  requireEnvApiKey,
+  requireExplicitIntent,
+} from "../helpers/live-intent";
 
-describe.skipIf(!apiKey)("DeepSeek live smoke", () => {
+describe("DeepSeek live smoke (explicit opt-in only)", () => {
+  let apiKey: string;
+
+  beforeAll(() => {
+    requireExplicitIntent(
+      LIVE_SMOKE_INTENT,
+      "Run `npm run test:live-smoke` instead of `npm test`.",
+    );
+    apiKey = requireEnvApiKey("DEEPSEEK_API_KEY");
+  });
+
   test("domestic provider returns schema-valid located findings", async () => {
     const { DeepSeekReviewModel } = await import("@/lib/server/llm/deepseek-review-model");
     const { createReview } = await import("@/lib/server/review-service");

@@ -1,8 +1,23 @@
-import { describe, expect, test } from "vitest";
+/** @vitest-environment node */
+import { beforeAll, describe, expect, test } from "vitest";
 
-const apiKey = process.env.OPENAI_API_KEY;
+import {
+  LIVE_SMOKE_INTENT,
+  requireEnvApiKey,
+  requireExplicitIntent,
+} from "../helpers/live-intent";
 
-describe.skipIf(!apiKey)("OpenAI live smoke (benchmark-only, not production)", () => {
+describe("OpenAI live smoke (explicit opt-in, not production)", () => {
+  let apiKey: string;
+
+  beforeAll(() => {
+    requireExplicitIntent(
+      LIVE_SMOKE_INTENT,
+      "Run `npm run test:live-smoke` instead of `npm test`.",
+    );
+    apiKey = requireEnvApiKey("OPENAI_API_KEY");
+  });
+
   test("live provider returns schema-valid candidates at least once", async () => {
     const { OpenAIReviewModel } = await import(
       "@/lib/server/llm/openai-review-model"

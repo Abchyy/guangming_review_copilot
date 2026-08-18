@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:dev-live": "BENCHMARK_DEV_LIVE=1 vitest run --config vitest.live.config.mts tests/live/dev-benchmark.test.ts",
+    "test:locked": "BENCHMARK_LOCKED=1 vitest run --config vitest.live.config.mts tests/live/locked-benchmark.test.ts",
+    "test:live-smoke": "LIVE_SMOKE=1 vitest run --config vitest.live.config.mts tests/live/deepseek-smoke.test.ts tests/live/openai-smoke.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",

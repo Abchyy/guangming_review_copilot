@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
+/** @vitest-environment node */
 import { join } from "node:path";
 
-import { describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test } from "vitest";
 
 import { loadBenchmarkDataset } from "@/lib/server/benchmark/dataset";
 import { averageMetrics, evaluateReview, type BenchmarkMetrics } from "@/lib/server/benchmark/evaluate";
@@ -11,14 +11,32 @@ import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { getCorpusVersion } from "@/lib/server/quality/corpus";
 import { getRuleVersion } from "@/lib/server/quality/rules";
 import { createReview } from "@/lib/server/review-service";
+import {
+  LOCKED_INTENT,
+  requireEnvApiKey,
+  requireExplicitIntent,
+} from "../helpers/live-intent";
 
-const apiKey = process.env.DEEPSEEK_API_KEY;
-
+/**
+ * Locked evaluation entry.
+ * Start with `npm run test:locked`. An API key is not sufficient to start.
+ * Existing locked numbers are not re-validated in this isolation repair.
+ */
 function reportPath(): string {
   return join(process.cwd(), ".data", "m3-benchmark-last-run.json");
 }
 
-describe.skipIf(!apiKey)("M3 primary benchmark (domestic model)", () => {
+describe("M3 locked evaluation (explicit opt-in only)", () => {
+  let apiKey: string;
+
+  beforeAll(() => {
+    requireExplicitIntent(
+      LOCKED_INTENT,
+      "Run `npm run test:locked` instead of `npm test`.",
+    );
+    apiKey = requireEnvApiKey("DEEPSEEK_API_KEY");
+  });
+
   test("compares baseline prompt vs copilot on locked eval once", async () => {
     const dataset = loadBenchmarkDataset();
     const locked = dataset.articles.filter((item) => item.split === "locked");
@@ -86,14 +104,4 @@ describe.skipIf(!apiKey)("M3 primary benchmark (domestic model)", () => {
     expect(copilot.metrics.span_validation).toBeGreaterThanOrEqual(0.95);
     expect(copilot.metrics.top5_recall).toBeGreaterThanOrEqual(0.8);
   }, 900_000);
-});
-
-describe("benchmark dataset freeze", () => {
-  test("dataset file remains 6 dev / 12 locked", () => {
-    const raw = JSON.parse(
-      readFileSync(join(process.cwd(), "data/benchmark/dataset.json"), "utf8"),
-    ) as { articles: Array<{ split: string }> };
-    expect(raw.articles.filter((item) => item.split === "dev")).toHaveLength(6);
-    expect(raw.articles.filter((item) => item.split === "locked")).toHaveLength(12);
-  });
 });

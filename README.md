@@ -30,3 +30,20 @@ npm run lint
 npm test
 npm run build
 ```
+
+## 测试入口
+
+三类执行入口彼此隔离。环境中即使已有 DeepSeek / OpenAI API Key，也不会让普通测试去调用外部模型。
+
+```bash
+# 平时本地测试：离线、零外部模型调用
+npm test
+
+# 主动跑 dev-live 诊断（显式 opt-in；结果不是正式 locked quality）
+npm run test:dev-live
+
+# 未来获准后跑 locked evaluation（显式 opt-in；仅有 API Key 不会启动）
+npm run test:locked
+```
+
+`npm run test:live-smoke` 同样是显式 opt-in 的诊断入口，不属于平时本地测试，也不冒充 locked 结果。
