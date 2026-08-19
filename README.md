@@ -42,8 +42,13 @@ npm test
 # 主动跑 dev-live 诊断（显式 opt-in；结果不是正式 locked quality）
 npm run test:dev-live
 
-# 未来获准后跑 locked evaluation（显式 opt-in；仅有 API Key 不会启动）
+# 正式 locked 入口（显式 opt-in）。当前仓库没有 hidden gold，会 fail-closed
 npm run test:locked
+
+# 本地验证 holdout 协议基础设施（非正式分数）
+npm run holdout:dry-run
 ```
 
 `npm run test:live-smoke` 同样是显式 opt-in 的诊断入口，不属于平时本地测试，也不冒充 locked 结果。
+
+数据集角色、inference freeze、blind inference 与 hidden gold 评测分离，见 `docs/benchmark-holdout.md`。

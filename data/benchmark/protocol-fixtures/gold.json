@@ -1,0 +1,23 @@
+{
+  "schema_version": "holdout-gold.v1",
+  "pack_id": "protocol-fixture-v1",
+  "role": "protocol_fixture",
+  "articles": [
+    {
+      "article_id": "fixture-01",
+      "title": "社区完成监控安装",
+      "body": "工作人员表示，新设备已经按装到位。",
+      "issues": [
+        {
+          "issue_id": "f01-typo",
+          "type": "basic_text",
+          "severity": "low",
+          "field": "body",
+          "quoted_text": "按装",
+          "occurrence": 0,
+          "requires_evidence": true
+        }
+      ]
+    }
+  ]
+}

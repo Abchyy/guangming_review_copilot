@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { parseLlmReviewOutput, type ReviewCandidate, type ReviewExecutionProvenance } from "@/lib/contracts/review";
 import { applicationCacheProvenance } from "@/lib/server/llm/provenance";
 import type { ReviewModel } from "@/lib/server/llm/review-model";
+import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
 
 function loadDemoCandidates(): ReviewCandidate[] {
-  const filePath = join(process.cwd(), "data", "fixtures", "demo-candidates.json");
+  const filePath = join(canonicalWorkspaceRoot(), "data", "fixtures", "demo-candidates.json");
   const raw: unknown = JSON.parse(readFileSync(filePath, "utf8"));
   return parseLlmReviewOutput(raw).candidates;
 }

@@ -1,0 +1,12 @@
+{
+  "schema_version": "holdout-input.v1",
+  "pack_id": "protocol-fixture-v1",
+  "role": "protocol_fixture",
+  "articles": [
+    {
+      "article_id": "fixture-01",
+      "title": "社区完成监控安装",
+      "body": "工作人员表示，新设备已经按装到位。"
+    }
+  ]
+}

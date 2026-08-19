@@ -192,7 +192,7 @@ describe("M3 rules, retrieval, evidence, fusion", () => {
   test("gold quotes in the 18-article dataset are locatable", () => {
     const dataset = loadBenchmarkDataset();
     expect(dataset.articles.filter((item) => item.split === "dev")).toHaveLength(6);
-    expect(dataset.articles.filter((item) => item.split === "locked")).toHaveLength(12);
+    expect(dataset.articles.filter((item) => item.split === "regression")).toHaveLength(12);
     for (const item of dataset.articles) {
       const result = evaluateReview(
         { title: item.title, body: item.body, version: 1 },

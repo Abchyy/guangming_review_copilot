@@ -15,7 +15,12 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
-    exclude: [...configDefaults.exclude, "tests/live/**"],
+    exclude: [
+      ...configDefaults.exclude,
+      "tests/live/**",
+      "tests/benchmark/holdout-chdir-probe.test.ts",
+      "tests/benchmark/holdout-consume-race-probe.test.ts",
+    ],
     setupFiles: ["./tests/setup.ts"],
   },
 });

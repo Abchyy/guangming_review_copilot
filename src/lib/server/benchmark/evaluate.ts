@@ -18,9 +18,11 @@ export type GoldIssue = {
   requires_evidence: boolean;
 };
 
+export type BenchmarkSplit = "dev" | "regression";
+
 export type BenchmarkArticle = {
   article_id: string;
-  split: "dev" | "locked";
+  split: BenchmarkSplit;
   title: string;
   body: string;
   issues: GoldIssue[];

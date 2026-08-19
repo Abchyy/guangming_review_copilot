@@ -1,0 +1,29 @@
+{
+  "schema_version": "holdout-registry.v1",
+  "entries": [
+    {
+      "holdout_id": "legacy-m3-locked-12",
+      "role": "regression",
+      "status": "consumed",
+      "contamination": "inference_assets",
+      "in_repo": true,
+      "gold_in_development_repo": true,
+      "may_claim_fresh_locked_generalization": false,
+      "article_ids": [
+        "lock-01",
+        "lock-02",
+        "lock-03",
+        "lock-04",
+        "lock-05",
+        "lock-06",
+        "lock-07",
+        "lock-08",
+        "lock-09",
+        "lock-10",
+        "lock-11",
+        "lock-12"
+      ],
+      "notes": "Former 12-article locked split. Contaminated by inference assets during M3 development. Retained only as regression / legacy contaminated data. Not official locked generalization evidence. A future official holdout must use hidden gold outside this development repo."
+    }
+  ]
+}

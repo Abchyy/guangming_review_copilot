@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 import { CORPUS_VERSION } from "@/lib/server/quality/versions";
+import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
 
 export const corpusReferenceSchema = z.object({
   source_id: z.string().min(1),
@@ -44,7 +45,7 @@ export function loadCorpus(): z.infer<typeof corpusFileSchema> {
   if (cachedCorpus) {
     return cachedCorpus;
   }
-  const filePath = join(process.cwd(), "data", "corpus", "references.json");
+  const filePath = join(canonicalWorkspaceRoot(), "data", "corpus", "references.json");
   cachedCorpus = corpusFileSchema.parse(JSON.parse(readFileSync(filePath, "utf8")));
   return cachedCorpus;
 }

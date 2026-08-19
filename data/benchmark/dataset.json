@@ -1,5 +1,14 @@
 {
   "dataset_version": "m3.1.0",
+  "role_policy": {
+    "dev": "development_diagnosis_tuning",
+    "regression": "legacy_contaminated_not_official_locked"
+  },
+  "regression_contamination": {
+    "reason": "inference_assets",
+    "former_role": "locked",
+    "may_claim_fresh_locked_generalization": false
+  },
   "articles": [
     {
       "article_id": "dev-01",
@@ -69,7 +78,7 @@
     },
     {
       "article_id": "lock-01",
-      "split": "locked",
+      "split": "regression",
       "title": "把安全做为第一责任",
       "body": "本报讯 上周五（10月1日），市应急管理局召开会议，强调把安全做为第一责任。",
       "issues": [
@@ -80,7 +89,7 @@
     },
     {
       "article_id": "lock-02",
-      "split": "locked",
+      "split": "regression",
       "title": "公布侯选名单",
       "body": "有关部门公布了侯选名单（第一批尚未完成审核。",
       "issues": [
@@ -91,7 +100,7 @@
     },
     {
       "article_id": "lock-03",
-      "split": "locked",
+      "split": "regression",
       "title": "假期出行提醒",
       "body": "有关方面提醒市民文明渡假。。景区将加强巡查。",
       "issues": [
@@ -101,7 +110,7 @@
     },
     {
       "article_id": "lock-04",
-      "split": "locked",
+      "split": "regression",
       "title": "提交入党申青书",
       "body": "该同志近日提交了入党申青书，组织部门正在审核。",
       "issues": [
@@ -111,7 +120,7 @@
     },
     {
       "article_id": "lock-05",
-      "split": "locked",
+      "split": "regression",
       "title": "加强新闻编缉培训",
       "body": "融媒体中心开展新闻编缉业务培训，强调严肃把关。",
       "issues": [
@@ -121,7 +130,7 @@
     },
     {
       "article_id": "lock-06",
-      "split": "locked",
+      "split": "regression",
       "title": "省卫生健康委通报疫情防控",
       "body": "省卫生健康委召开调度会。会后材料误写由省卫生厅负责后续工作。",
       "issues": [
@@ -130,7 +139,7 @@
     },
     {
       "article_id": "lock-07",
-      "split": "locked",
+      "split": "regression",
       "title": "财政运行总体平稳",
       "body": "通报称，全市一般公共预算收入30亿元。年终快报又写全市一般公共预算收入38亿元。",
       "issues": [
@@ -140,7 +149,7 @@
     },
     {
       "article_id": "lock-08",
-      "split": "locked",
+      "split": "regression",
       "title": "学习规划纲要",
       "body": "与会人员认真学习《教育强国建设规划纲要（2023－2035年）》，并结合实际谈体会。",
       "issues": [
@@ -149,7 +158,7 @@
     },
     {
       "article_id": "lock-09",
-      "split": "locked",
+      "split": "regression",
       "title": "县里召开教育工作座谈谈会",
       "body": "日前，县教育局召开教育工作座谈谈会，研究开学安排。",
       "issues": [
@@ -159,7 +168,7 @@
     },
     {
       "article_id": "lock-10",
-      "split": "locked",
+      "split": "regression",
       "title": "春耕生产一线见闻",
       "body": "本报讯 上周四（3月1日），记者在田间看到农技人员正在指导春耕。",
       "issues": [
@@ -168,7 +177,7 @@
     },
     {
       "article_id": "lock-11",
-      "split": "locked",
+      "split": "regression",
       "title": "新设备按装完成",
       "body": "学校完成监控按装。同时通报义务教育阶段在校生共9万人，另一材料写义务教育阶段在校生共11万人。",
       "issues": [
@@ -180,7 +189,7 @@
     },
     {
       "article_id": "lock-12",
-      "split": "locked",
+      "split": "regression",
       "title": "李建国检查城市运行",
       "body": "李建国到地铁站检查。新闻稿后段写成李建华市长提出具体要求。",
       "issues": [

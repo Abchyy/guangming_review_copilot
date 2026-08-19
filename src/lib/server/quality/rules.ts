@@ -12,6 +12,7 @@ import type {
 } from "@/lib/contracts/review";
 import { fieldText, paragraphIndexAt } from "@/lib/server/span-locator";
 import { RULE_VERSION } from "@/lib/server/quality/versions";
+import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
 
 const catalogSchema = z.object({
   rule_version: z.string(),
@@ -70,7 +71,7 @@ export function loadRuleCatalog(): z.infer<typeof catalogSchema> {
   if (cachedCatalog) {
     return cachedCatalog;
   }
-  const filePath = join(process.cwd(), "data", "rules", "catalog.json");
+  const filePath = join(canonicalWorkspaceRoot(), "data", "rules", "catalog.json");
   cachedCatalog = catalogSchema.parse(JSON.parse(readFileSync(filePath, "utf8")));
   return cachedCatalog;
 }

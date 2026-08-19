@@ -33,6 +33,12 @@ import type {
 const JSON_OUTPUT_INSTRUCTION = `你必须输出 json 对象，不要输出 Markdown 代码围栏。EXAMPLE JSON OUTPUT:
 {"candidates":[{"type":"basic_text","severity":"low","title":"错别字","reason":"正文将座谈会写成座谈谈会。","suggestion":{"text":"改为座谈会。","replacement":"座谈会"},"confidence":0.9,"evidence":[{"kind":"ai_judgment","excerpt":"常见会议名称应为座谈会。","citation_validated":false}],"source":{"field":"body","exact_quote":"座谈谈会","paragraph_index":0,"context_before":null,"context_after":null}}]}`;
 
+export const DEEPSEEK_RETRY_POLICY = {
+  max_attempts: 2,
+  timeout_ms: 60_000,
+  max_tokens: 8192,
+} as const;
+
 type DeepSeekReviewModelOptions = {
   apiKey?: string;
   baseURL?: string;
@@ -93,7 +99,7 @@ export class DeepSeekReviewModel implements ReviewModel {
       new OpenAI({
         apiKey,
         baseURL: options.baseURL ?? getDeepSeekBaseUrl(),
-        timeout: options.timeoutMs ?? 60_000,
+        timeout: options.timeoutMs ?? DEEPSEEK_RETRY_POLICY.timeout_ms,
       })) as unknown as ChatCompletionsClient;
   }
 
@@ -117,7 +123,7 @@ export class DeepSeekReviewModel implements ReviewModel {
     const attempts: ProviderAttempt[] = [];
     let lastError: unknown;
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+    for (let attempt = 1; attempt <= DEEPSEEK_RETRY_POLICY.max_attempts; attempt += 1) {
       const result = await this.reviewOnce(article, context, attempt);
       attempts.push(result.attempt);
       if (result.ok) {
@@ -125,7 +131,7 @@ export class DeepSeekReviewModel implements ReviewModel {
         return result.candidates;
       }
       lastError = result.error;
-      if (attempt === 1 && isRetryable(lastError)) {
+      if (attempt < DEEPSEEK_RETRY_POLICY.max_attempts && isRetryable(lastError)) {
         continue;
       }
       this.commitProvenance(attempts, startedAt);
@@ -176,7 +182,7 @@ export class DeepSeekReviewModel implements ReviewModel {
           },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 8192,
+        max_tokens: DEEPSEEK_RETRY_POLICY.max_tokens,
         extra_body: { thinking: { type: "disabled" } },
       });
       receivedProviderResponse = true;
