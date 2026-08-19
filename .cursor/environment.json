@@ -1,0 +1,10 @@
+{
+  "name": "Guangming Review Copilot",
+  "install": "npm ci && npm run build",
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "npm run dev"
+    }
+  ]
+}
