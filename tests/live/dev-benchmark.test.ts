@@ -13,8 +13,12 @@ import {
   type GoldIssue,
 } from "@/lib/server/benchmark/evaluate";
 import type { Finding } from "@/lib/contracts/review";
+import { aggregateCallSnapshots, snapshotFromProvenance } from "@/lib/server/benchmark/runtime-report";
 import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
-import { estimateDeepSeekCostUsd } from "@/lib/server/llm/deepseek-pricing";
+import {
+  OFFICIAL_BENCHMARK_MODEL,
+  assertObservedModelMatchesExpected,
+} from "@/lib/server/llm/provenance";
 import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { getCorpusVersion } from "@/lib/server/quality/corpus";
 import { getRuleVersion } from "@/lib/server/quality/rules";
@@ -109,53 +113,35 @@ describe("M3 development benchmark (diagnostic, not locked quality)", () => {
       const rows: BenchmarkMetrics[] = [];
       const contamination: string[] = [];
       const articleReports = [];
-      let inputTokens = 0;
-      let outputTokens = 0;
-      let cachedInputTokens = 0;
-      let usageMissing = false;
-      let costMissing = false;
-      let totalLatency = 0;
-      let apiCalls = 0;
+      const runtimes = [];
 
       for (const article of selected) {
         const model = new DeepSeekReviewModel({ apiKey });
-        const started = Date.now();
         const snapshot = await createReview(
           { title: article.title, body: article.body },
           model,
           { promptMode: mode, useCache: false },
         );
-        apiCalls += 1;
-        if (snapshot.pipeline.provider !== "deepseek") {
-          throw new Error(`Unexpected provider: ${snapshot.pipeline.provider}`);
+        const provenance = snapshot.pipeline.provenance;
+        if (!provenance) {
+          throw new Error("Dev-live benchmark requires execution provenance");
         }
-        if (snapshot.pipeline.model !== "deepseek-v4-flash") {
-          throw new Error(`Unexpected model: ${snapshot.pipeline.model}`);
+        if (provenance.adapter_provider !== "deepseek") {
+          throw new Error(`Unexpected adapter provider: ${provenance.adapter_provider}`);
         }
-        const usage = model.consumeLastUsage?.() ?? null;
+        assertObservedModelMatchesExpected(provenance, OFFICIAL_BENCHMARK_MODEL);
+        const runtime = snapshotFromProvenance(provenance);
+        runtimes.push(runtime);
         const evaluated = evaluateReview(snapshot.article, snapshot.findings, article.issues);
         if (evaluated.goldLocateFailures.length > 0) {
           contamination.push(`${article.article_id}: gold locate failed`);
         }
-        const latency = usage?.latency_ms ?? Date.now() - started;
-        const cost = usage ? estimateDeepSeekCostUsd(usage) : null;
-        if (!usage || usage.input_tokens == null || usage.output_tokens == null) {
-          usageMissing = true;
-        } else {
-          inputTokens += usage.input_tokens;
-          outputTokens += usage.output_tokens;
-          cachedInputTokens += usage.cached_input_tokens ?? 0;
-        }
-        if (cost == null) {
-          costMissing = true;
-        }
-        totalLatency += latency;
         const goldById = new Map(article.issues.map((issue) => [issue.issue_id, issue]));
         const findingById = new Map(snapshot.findings.map((finding) => [finding.finding_id, finding]));
         rows.push({
           ...evaluated.metrics,
-          latency_ms: latency,
-          cost_usd: cost,
+          latency_ms: runtime.latency_ms,
+          cost_usd: runtime.cost_usd,
         });
         articleReports.push({
           article_id: article.article_id,
@@ -194,17 +180,11 @@ describe("M3 development benchmark (diagnostic, not locked quality)", () => {
           },
           metrics: {
             ...evaluated.metrics,
-            latency_ms: latency,
-            cost_usd: cost,
+            latency_ms: runtime.latency_ms,
+            cost_usd: runtime.cost_usd,
           },
-          usage: usage
-            ? {
-                input_tokens: usage.input_tokens,
-                output_tokens: usage.output_tokens,
-                cached_input_tokens: usage.cached_input_tokens,
-                latency_ms: usage.latency_ms,
-              }
-            : null,
+          provenance,
+          runtime,
         });
       }
 
@@ -212,14 +192,7 @@ describe("M3 development benchmark (diagnostic, not locked quality)", () => {
         metrics: averageMetrics(rows),
         contamination,
         articles: articleReports,
-        runtime: {
-          api_calls: apiCalls,
-          input_tokens: usageMissing ? null : inputTokens,
-          output_tokens: usageMissing ? null : outputTokens,
-          cached_input_tokens: usageMissing ? null : cachedInputTokens,
-          total_latency_ms: totalLatency,
-          total_cost_usd: costMissing ? null : articleReports.reduce((sum, item) => sum + (item.metrics.cost_usd ?? 0), 0),
-        },
+        runtime: aggregateCallSnapshots(runtimes),
       };
     }
 
@@ -230,11 +203,10 @@ describe("M3 development benchmark (diagnostic, not locked quality)", () => {
       split: "dev",
       article_ids: articles.map((item) => item.article_id),
       gold_issues: articles.reduce((sum, item) => sum + item.issues.length, 0),
-      provider: "deepseek",
-      model: "deepseek-v4-flash",
-      cache_disabled: true,
-      real_api: true,
+      expected_provider: "deepseek",
+      expected_model: OFFICIAL_BENCHMARK_MODEL,
       diagnostic_only: true,
+      official: false,
       baseline_prompt: PROMPT_VERSION,
       copilot_versions: {
         prompt: PROMPT_VERSION,
@@ -263,7 +235,9 @@ describe("M3 development benchmark (diagnostic, not locked quality)", () => {
 
     expect(payload.split).toBe("dev");
     expect(payload.article_ids).toHaveLength(6);
-    expect(baseline.runtime.api_calls).toBe(6);
-    expect(copilot.runtime.api_calls).toBe(6);
+    expect(baseline.runtime.logical_calls).toBe(6);
+    expect(copilot.runtime.logical_calls).toBe(6);
+    expect(baseline.runtime.application_cache.hit).toBe(false);
+    expect(copilot.runtime.application_cache.hit).toBe(false);
   }, 900_000);
 });

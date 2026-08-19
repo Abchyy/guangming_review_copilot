@@ -4,6 +4,12 @@ export type DeepSeekUsage = {
   cached_input_tokens: number | null;
 };
 
+export type DeepSeekCostEstimate = {
+  cost_usd: number | null;
+  cost_status: "determined" | "indeterminate" | "not_applicable";
+  cache_pricing: "reported" | "not_reported" | "not_applicable";
+};
+
 const PEAK_INPUT_MISS = 0.44;
 const PEAK_INPUT_HIT = 0.014;
 const PEAK_OUTPUT = 1.32;
@@ -16,15 +22,34 @@ function isPeakUtc(now: Date): boolean {
   return (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10);
 }
 
-export function estimateDeepSeekCostUsd(usage: DeepSeekUsage, now = new Date()): number | null {
+export function estimateDeepSeekCost(usage: DeepSeekUsage, now = new Date()): DeepSeekCostEstimate {
   if (usage.input_tokens == null || usage.output_tokens == null) {
-    return null;
+    return {
+      cost_usd: null,
+      cost_status: "not_applicable",
+      cache_pricing: "not_applicable",
+    };
+  }
+  if (usage.cached_input_tokens == null) {
+    return {
+      cost_usd: null,
+      cost_status: "indeterminate",
+      cache_pricing: "not_reported",
+    };
   }
   const peak = isPeakUtc(now);
   const inputHitPrice = peak ? PEAK_INPUT_HIT : OFFPEAK_INPUT_HIT;
   const inputMissPrice = peak ? PEAK_INPUT_MISS : OFFPEAK_INPUT_MISS;
   const outputPrice = peak ? PEAK_OUTPUT : OFFPEAK_OUTPUT;
-  const cached = Math.min(usage.cached_input_tokens ?? 0, usage.input_tokens);
+  const cached = Math.min(usage.cached_input_tokens, usage.input_tokens);
   const miss = usage.input_tokens - cached;
-  return (cached * inputHitPrice + miss * inputMissPrice + usage.output_tokens * outputPrice) / 1_000_000;
+  return {
+    cost_usd: (cached * inputHitPrice + miss * inputMissPrice + usage.output_tokens * outputPrice) / 1_000_000,
+    cost_status: "determined",
+    cache_pricing: "reported",
+  };
+}
+
+export function estimateDeepSeekCostUsd(usage: DeepSeekUsage, now = new Date()): number | null {
+  return estimateDeepSeekCost(usage, now).cost_usd;
 }

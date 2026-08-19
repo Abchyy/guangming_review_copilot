@@ -15,6 +15,10 @@ import {
 import { canonicalizeArticle } from "@/lib/server/normalization";
 import type { ReviewModel, ReviewPromptMode } from "@/lib/server/llm/review-model";
 import { LlmCandidateCache } from "@/lib/server/llm/candidate-cache";
+import {
+  attachApplicationCache,
+  fallbackProvenance,
+} from "@/lib/server/llm/provenance";
 import { PROMPT_VERSION, OUTPUT_SCHEMA_VERSION } from "@/lib/server/llm/prompt";
 import { getReviewDatabase } from "@/lib/server/db";
 import {
@@ -128,6 +132,23 @@ export async function createReview(
     }
   }
 
+  const applicationCache = { enabled: shouldCache, hit: cacheHit };
+  const provenance = cacheHit
+    ? fallbackProvenance({
+        adapterProvider: model.provider,
+        requestedModel: model.model,
+        applicationCache,
+      })
+    : attachApplicationCache(
+        model.consumeLastProvenance?.() ??
+          fallbackProvenance({
+            adapterProvider: model.provider,
+            requestedModel: model.model,
+            applicationCache,
+          }),
+        applicationCache,
+      );
+
   const { candidates } = parseLlmReviewOutput({ candidates: rawCandidates });
   const limited = candidates.slice(0, 20);
   const llmDrafts: DraftFinding[] = [];
@@ -178,10 +199,10 @@ export async function createReview(
       located_count: findings.length,
       dropped_count: dropped,
       elapsed_ms: Date.now() - startedAt,
+      provenance,
     },
   };
 
-  void cacheHit;
   return createReviewResponseSchema.parse(response);
 }
 

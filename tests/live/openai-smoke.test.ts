@@ -1,6 +1,8 @@
 /** @vitest-environment node */
 import { beforeAll, describe, expect, test } from "vitest";
 
+import { DEFAULT_OPENAI_BENCHMARK_MODEL } from "@/lib/server/config";
+import { assertObservedModelMatchesExpected } from "@/lib/server/llm/provenance";
 import {
   LIVE_SMOKE_INTENT,
   requireEnvApiKey,
@@ -32,6 +34,12 @@ describe("OpenAI live smoke (explicit opt-in, not production)", () => {
       model,
     );
     expect(result.pipeline.provider).toBe("openai");
+    expect(result.pipeline.provenance?.adapter_provider).toBe("openai");
+    expect(result.pipeline.provenance?.requested_model).toBe(DEFAULT_OPENAI_BENCHMARK_MODEL);
+    assertObservedModelMatchesExpected(
+      result.pipeline.provenance!,
+      DEFAULT_OPENAI_BENCHMARK_MODEL,
+    );
     expect(Array.isArray(result.findings)).toBe(true);
     for (const finding of result.findings) {
       const text =

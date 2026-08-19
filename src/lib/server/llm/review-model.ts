@@ -1,4 +1,4 @@
-import type { CanonicalArticle, ReviewCandidate, ReviewProvider } from "@/lib/contracts/review";
+import type { CanonicalArticle, ReviewCandidate, ReviewExecutionProvenance, ReviewProvider } from "@/lib/contracts/review";
 
 export type ReviewPromptMode = "baseline" | "copilot";
 
@@ -33,4 +33,5 @@ export interface ReviewModel {
   readonly model: string | null;
   review(article: CanonicalArticle, context?: ReviewPromptContext): Promise<ReviewCandidate[]>;
   consumeLastUsage?(): ProviderCallUsage | null;
+  consumeLastProvenance?(): ReviewExecutionProvenance | null;
 }

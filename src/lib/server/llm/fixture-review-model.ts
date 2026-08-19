@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseLlmReviewOutput, type ReviewCandidate } from "@/lib/contracts/review";
+import { parseLlmReviewOutput, type ReviewCandidate, type ReviewExecutionProvenance } from "@/lib/contracts/review";
+import { applicationCacheProvenance } from "@/lib/server/llm/provenance";
 import type { ReviewModel } from "@/lib/server/llm/review-model";
 
 function loadDemoCandidates(): ReviewCandidate[] {
@@ -21,5 +22,14 @@ export class FixtureReviewModel implements ReviewModel {
 
   review(): Promise<ReviewCandidate[]> {
     return Promise.resolve(this.candidates.map((candidate) => structuredClone(candidate)));
+  }
+
+  consumeLastProvenance(): ReviewExecutionProvenance {
+    return applicationCacheProvenance({
+      adapterProvider: this.provider,
+      requestedModel: this.model,
+      enabled: false,
+      hit: false,
+    });
   }
 }

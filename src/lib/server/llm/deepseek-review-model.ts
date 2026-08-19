@@ -4,13 +4,22 @@ import {
   parseLlmReviewOutput,
   ReviewProviderError,
   type CanonicalArticle,
+  type ProviderAttempt,
   type ReviewCandidate,
+  type ReviewExecutionProvenance,
 } from "@/lib/contracts/review";
 import {
   getDeepSeekApiKey,
   getDeepSeekBaseUrl,
   getReviewModelName,
 } from "@/lib/server/config";
+import {
+  attemptRecord,
+  buildHttpProvenance,
+  extractObservedUsage,
+  observedString,
+  projectUsage,
+} from "@/lib/server/llm/provenance";
 import {
   buildReviewSystemPrompt,
   buildReviewUserPrompt,
@@ -36,6 +45,7 @@ type ChatCompletionsClient = {
   chat: {
     completions: {
       create: (params: Record<string, unknown>) => Promise<{
+        model?: string | null;
         choices?: Array<{ message?: { content?: string | null } }>;
         usage?: {
           prompt_tokens?: number;
@@ -56,7 +66,7 @@ function isRetryable(error: unknown): boolean {
     );
   }
   if (typeof error === "object" && error !== null && "status" in error) {
-    const status = Number((error as { status?: number }).status);
+    const status = Number((error as { status?: unknown }).status);
     if (status === 401 || status === 403 || status === 400) {
       return false;
     }
@@ -70,6 +80,7 @@ export class DeepSeekReviewModel implements ReviewModel {
   readonly model: string;
   private readonly client: ChatCompletionsClient;
   private lastUsage: ProviderCallUsage | null = null;
+  private lastProvenance: ReviewExecutionProvenance | null = null;
 
   constructor(options: DeepSeekReviewModelOptions = {}) {
     const apiKey = options.apiKey ?? getDeepSeekApiKey();
@@ -92,41 +103,64 @@ export class DeepSeekReviewModel implements ReviewModel {
     return usage;
   }
 
+  consumeLastProvenance(): ReviewExecutionProvenance | null {
+    const provenance = this.lastProvenance;
+    this.lastProvenance = null;
+    return provenance;
+  }
+
   async review(
     article: CanonicalArticle,
     context: ReviewPromptContext = {},
   ): Promise<ReviewCandidate[]> {
     const startedAt = Date.now();
-    try {
-      return await this.reviewOnce(article, context, startedAt);
-    } catch (error) {
-      if (!isRetryable(error)) {
-        throw error instanceof ReviewProviderError
-          ? error
-          : new ReviewProviderError("DeepSeek provider unavailable", error);
+    const attempts: ProviderAttempt[] = [];
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const result = await this.reviewOnce(article, context, attempt);
+      attempts.push(result.attempt);
+      if (result.ok) {
+        this.commitProvenance(attempts, startedAt);
+        return result.candidates;
       }
-      try {
-        return await this.reviewOnce(article, context, startedAt);
-      } catch (retryError) {
-        if (retryError instanceof ReviewProviderError) {
-          throw retryError;
-        }
-        throw new ReviewProviderError("DeepSeek provider unavailable", retryError);
+      lastError = result.error;
+      if (attempt === 1 && isRetryable(lastError)) {
+        continue;
       }
+      this.commitProvenance(attempts, startedAt);
+      throw lastError instanceof ReviewProviderError
+        ? lastError
+        : new ReviewProviderError("DeepSeek provider unavailable", lastError);
     }
+
+    this.commitProvenance(attempts, startedAt);
+    throw lastError instanceof ReviewProviderError
+      ? lastError
+      : new ReviewProviderError("DeepSeek provider unavailable", lastError);
+  }
+
+  private commitProvenance(attempts: ProviderAttempt[], startedAt: number): void {
+    this.lastProvenance = buildHttpProvenance({
+      adapterProvider: this.provider,
+      requestedModel: this.model,
+      attempts,
+      latencyMs: Date.now() - startedAt,
+    });
+    this.lastUsage = projectUsage(this.lastProvenance);
   }
 
   private async reviewOnce(
     article: CanonicalArticle,
     context: ReviewPromptContext,
-    startedAt: number,
-  ): Promise<ReviewCandidate[]> {
-    let content: string | null | undefined;
-    let usage: {
-      prompt_tokens?: number;
-      completion_tokens?: number;
-      prompt_tokens_details?: { cached_tokens?: number };
-    } | undefined;
+    attempt: number,
+  ): Promise<
+    | { ok: true; candidates: ReviewCandidate[]; attempt: ProviderAttempt }
+    | { ok: false; error: unknown; attempt: ProviderAttempt }
+  > {
+    let observedModel: string | null = null;
+    let usage = null as ReturnType<typeof extractObservedUsage>;
+    let receivedProviderResponse = false;
 
     try {
       const response = await this.client.chat.completions.create({
@@ -145,33 +179,78 @@ export class DeepSeekReviewModel implements ReviewModel {
         max_tokens: 8192,
         extra_body: { thinking: { type: "disabled" } },
       });
-      content = response.choices?.[0]?.message?.content;
-      usage = response.usage;
-    } catch (error) {
-      if (error instanceof ReviewProviderError) {
-        throw error;
+      receivedProviderResponse = true;
+      observedModel = observedString(response.model);
+      usage = extractObservedUsage(response.usage);
+      const content = response.choices?.[0]?.message?.content;
+      if (content == null || content.trim().length === 0) {
+        const error = new ReviewProviderError("Provider response was empty");
+        return {
+          ok: false,
+          error,
+          attempt: attemptRecord({
+            attempt,
+            outcome: "retryable_failure",
+            requestedModel: this.model,
+            observedResponseModel: observedModel,
+            receivedProviderResponse,
+            usage,
+            error,
+          }),
+        };
       }
-      throw new ReviewProviderError("DeepSeek provider unavailable", error);
+
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(content);
+      } catch {
+        const error = new ReviewProviderError("Provider response was not valid JSON");
+        return {
+          ok: false,
+          error,
+          attempt: attemptRecord({
+            attempt,
+            outcome: "retryable_failure",
+            requestedModel: this.model,
+            observedResponseModel: observedModel,
+            receivedProviderResponse,
+            usage,
+            error,
+          }),
+        };
+      }
+
+      return {
+        ok: true,
+        candidates: parseLlmReviewOutput(parsedJson).candidates.slice(0, 20),
+        attempt: attemptRecord({
+          attempt,
+          outcome: "success",
+          requestedModel: this.model,
+          observedResponseModel: observedModel,
+          receivedProviderResponse,
+          usage,
+          error: null,
+        }),
+      };
+    } catch (error) {
+      const wrapped =
+        error instanceof ReviewProviderError
+          ? error
+          : new ReviewProviderError("DeepSeek provider unavailable", error);
+      return {
+        ok: false,
+        error: wrapped,
+        attempt: attemptRecord({
+          attempt,
+          outcome: isRetryable(wrapped) ? "retryable_failure" : "fatal_failure",
+          requestedModel: this.model,
+          observedResponseModel: observedModel,
+          receivedProviderResponse,
+          usage,
+          error: wrapped,
+        }),
+      };
     }
-
-    this.lastUsage = {
-      input_tokens: usage?.prompt_tokens ?? null,
-      output_tokens: usage?.completion_tokens ?? null,
-      cached_input_tokens: usage?.prompt_tokens_details?.cached_tokens ?? null,
-      latency_ms: Date.now() - startedAt,
-    };
-
-    if (content == null || content.trim().length === 0) {
-      throw new ReviewProviderError("Provider response was empty");
-    }
-
-    let parsedJson: unknown;
-    try {
-      parsedJson = JSON.parse(content);
-    } catch {
-      throw new ReviewProviderError("Provider response was not valid JSON");
-    }
-
-    return parseLlmReviewOutput(parsedJson).candidates.slice(0, 20);
   }
 }

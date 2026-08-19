@@ -1,6 +1,8 @@
 /** @vitest-environment node */
 import { beforeAll, describe, expect, test } from "vitest";
 
+import { DEFAULT_PRODUCTION_MODEL } from "@/lib/server/config";
+import { assertObservedModelMatchesExpected } from "@/lib/server/llm/provenance";
 import {
   LIVE_SMOKE_INTENT,
   requireEnvApiKey,
@@ -31,7 +33,10 @@ describe("DeepSeek live smoke (explicit opt-in only)", () => {
       { useCache: false },
     );
     expect(result.pipeline.provider).toBe("deepseek");
-    expect(result.pipeline.model).toBe("deepseek-v4-flash");
+    expect(result.pipeline.provenance?.adapter_provider).toBe("deepseek");
+    expect(result.pipeline.provenance?.requested_model).toBe(DEFAULT_PRODUCTION_MODEL);
+    expect(result.pipeline.provenance?.application_cache.hit).toBe(false);
+    assertObservedModelMatchesExpected(result.pipeline.provenance!, DEFAULT_PRODUCTION_MODEL);
     expect(Array.isArray(result.findings)).toBe(true);
     for (const finding of result.findings) {
       const text =

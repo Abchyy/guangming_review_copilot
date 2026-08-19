@@ -159,6 +159,55 @@ export const createReviewRequestSchema = z.object({
   body: z.string(),
 });
 
+export const cachedTokenStatusSchema = z.enum(["reported", "not_reported", "mixed"]);
+export const observationCompletenessSchema = z.enum(["complete", "incomplete", "not_observed"]);
+export const observedModelStatusSchema = z.enum(["observed", "not_reported", "inconsistent"]);
+export const attemptOutcomeSchema = z.enum(["success", "retryable_failure", "fatal_failure"]);
+export const costStatusSchema = z.enum(["determined", "indeterminate", "not_applicable"]);
+
+export const observedUsageSchema = z.object({
+  input_tokens: z.number().nullable(),
+  output_tokens: z.number().nullable(),
+  cached_input_tokens: z.number().nullable(),
+  cached_input_tokens_status: z.enum(["reported", "not_reported"]),
+});
+
+export const providerAttemptSchema = z.object({
+  attempt: z.number().int().positive(),
+  outcome: attemptOutcomeSchema,
+  requested_model: z.string().nullable(),
+  observed_response_model: z.string().nullable(),
+  received_provider_response: z.boolean(),
+  usage: observedUsageSchema.nullable(),
+  error: z.string().nullable(),
+});
+
+export const aggregatedUsageSchema = z.object({
+  input_tokens: z.number().nullable(),
+  input_tokens_completeness: observationCompletenessSchema,
+  output_tokens: z.number().nullable(),
+  output_tokens_completeness: observationCompletenessSchema,
+  cached_input_tokens: z.number().nullable(),
+  cached_input_tokens_status: cachedTokenStatusSchema,
+  cached_input_tokens_completeness: observationCompletenessSchema,
+  unobserved_usage_attempts: z.number().int().nonnegative(),
+});
+
+export const reviewExecutionProvenanceSchema = z.object({
+  adapter_provider: z.enum(REVIEW_PROVIDERS),
+  requested_model: z.string().nullable(),
+  observed_response_model: z.string().nullable(),
+  observed_response_model_status: observedModelStatusSchema,
+  attempt_count: z.number().int().nonnegative(),
+  attempts: z.array(providerAttemptSchema),
+  aggregated_usage: aggregatedUsageSchema,
+  application_cache: z.object({
+    enabled: z.boolean(),
+    hit: z.boolean(),
+  }),
+  latency_ms: z.number().nonnegative(),
+});
+
 export const pipelineMetadataSchema = z.object({
   provider: z.enum(REVIEW_PROVIDERS),
   model: z.string().nullable(),
@@ -166,6 +215,7 @@ export const pipelineMetadataSchema = z.object({
   located_count: z.number().int().nonnegative(),
   dropped_count: z.number().int().nonnegative(),
   elapsed_ms: z.number().nonnegative(),
+  provenance: reviewExecutionProvenanceSchema.optional(),
 });
 
 export const createReviewResponseSchema = z.object({
@@ -191,6 +241,14 @@ export type LlmReviewOutput = z.infer<typeof llmReviewOutputSchema>;
 export type Finding = z.infer<typeof findingSchema>;
 export type CanonicalArticle = z.infer<typeof articleSchema>;
 export type CreateReviewRequest = z.infer<typeof createReviewRequestSchema>;
+export type ObservedUsage = z.infer<typeof observedUsageSchema>;
+export type ProviderAttempt = z.infer<typeof providerAttemptSchema>;
+export type AggregatedUsage = z.infer<typeof aggregatedUsageSchema>;
+export type ReviewExecutionProvenance = z.infer<typeof reviewExecutionProvenanceSchema>;
+export type CachedTokenStatus = z.infer<typeof cachedTokenStatusSchema>;
+export type ObservationCompleteness = z.infer<typeof observationCompletenessSchema>;
+export type AttemptOutcome = z.infer<typeof attemptOutcomeSchema>;
+export type CostStatus = z.infer<typeof costStatusSchema>;
 export type PipelineMetadata = z.infer<typeof pipelineMetadataSchema>;
 export type CreateReviewResponse = z.infer<typeof createReviewResponseSchema>;
 export type FindingDecisionRequest = z.infer<typeof findingDecisionRequestSchema>;

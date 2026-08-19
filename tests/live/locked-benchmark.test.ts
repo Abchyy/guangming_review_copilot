@@ -5,8 +5,9 @@ import { beforeAll, describe, expect, test } from "vitest";
 
 import { loadBenchmarkDataset } from "@/lib/server/benchmark/dataset";
 import { averageMetrics, evaluateReview, type BenchmarkMetrics } from "@/lib/server/benchmark/evaluate";
+import { aggregateCallSnapshots, snapshotFromProvenance, type CallRuntimeSnapshot } from "@/lib/server/benchmark/runtime-report";
 import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
-import { estimateDeepSeekCostUsd } from "@/lib/server/llm/deepseek-pricing";
+import { OFFICIAL_BENCHMARK_MODEL, assertOfficialBenchmarkProvenance } from "@/lib/server/llm/provenance";
 import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { getCorpusVersion } from "@/lib/server/quality/corpus";
 import { getRuleVersion } from "@/lib/server/quality/rules";
@@ -44,45 +45,58 @@ describe("M3 locked evaluation (explicit opt-in only)", () => {
 
     async function runSplit(
       mode: "baseline" | "copilot",
-    ): Promise<{ metrics: BenchmarkMetrics; contamination: string[] }> {
+    ): Promise<{ metrics: BenchmarkMetrics; contamination: string[]; runtime: ReturnType<typeof aggregateCallSnapshots> }> {
       const rows: BenchmarkMetrics[] = [];
       const contamination: string[] = [];
+      const runtimes: CallRuntimeSnapshot[] = [];
       for (const article of locked) {
         const model = new DeepSeekReviewModel({ apiKey });
-        const started = Date.now();
         const snapshot = await createReview(
           { title: article.title, body: article.body },
           model,
           { promptMode: mode, useCache: false },
         );
-        const usage = model.consumeLastUsage?.() ?? null;
+        const provenance = snapshot.pipeline.provenance;
+        if (!provenance) {
+          throw new Error("Locked evaluation requires execution provenance");
+        }
+        assertOfficialBenchmarkProvenance(provenance);
+        const runtime = snapshotFromProvenance(provenance);
         const evaluated = evaluateReview(snapshot.article, snapshot.findings, article.issues);
         if (evaluated.goldLocateFailures.length > 0) {
           contamination.push(`${article.article_id}: gold locate failed`);
         }
         rows.push({
           ...evaluated.metrics,
-          latency_ms: usage?.latency_ms ?? Date.now() - started,
-          cost_usd: usage ? estimateDeepSeekCostUsd(usage) : null,
+          latency_ms: runtime.latency_ms,
+          cost_usd: runtime.cost_usd,
         });
+        runtimes.push(runtime);
       }
-      return { metrics: averageMetrics(rows), contamination };
+      return { metrics: averageMetrics(rows), contamination, runtime: aggregateCallSnapshots(runtimes) };
     }
 
     const baseline = await runSplit("baseline");
     const copilot = await runSplit("copilot");
     const payload = {
       dataset: dataset.dataset_version,
-      provider: "deepseek",
-      model: "deepseek-v4-flash",
+      expected_provider: "deepseek",
+      expected_model: OFFICIAL_BENCHMARK_MODEL,
+      official: true,
       baseline_prompt: PROMPT_VERSION,
       copilot_versions: {
         prompt: PROMPT_VERSION,
         rules: getRuleVersion(),
         corpus: getCorpusVersion(),
       },
-      baseline: baseline.metrics,
-      copilot: copilot.metrics,
+      baseline: {
+        metrics: baseline.metrics,
+        runtime: baseline.runtime,
+      },
+      copilot: {
+        metrics: copilot.metrics,
+        runtime: copilot.runtime,
+      },
       contamination: [...baseline.contamination, ...copilot.contamination],
     };
     try {
