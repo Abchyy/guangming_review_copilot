@@ -105,6 +105,7 @@ describe("official cwd drift isolation", () => {
       await expect(
         runOfficialBlindInference({
           freeze,
+          runFreeze: { run_freeze_id: "0".repeat(64) } as never,
           inputPack,
           model: new ScriptedReviewModel({
             provider: "deepseek",
@@ -122,6 +123,7 @@ describe("official cwd drift isolation", () => {
             schema_version: "holdout-prediction.v1",
             prediction_id: "x",
             freeze_id: freeze.freeze_id,
+            run_freeze_id: null,
             input_pack_id: inputPack.pack_id,
             input_content_sha256: inputPack.content_sha256,
             role: "locked",

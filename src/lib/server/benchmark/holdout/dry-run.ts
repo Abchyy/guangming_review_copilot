@@ -38,6 +38,8 @@ export async function runProtocolDryRun(options: {
       prompt_mode: "copilot",
       application_cache: { enabled: false },
       retry: { max_attempts: 1, timeout_ms: null, max_tokens: null },
+      provider_endpoint: null,
+      account_boundary_id: null,
     },
   });
   const prediction = await runBlindInference({

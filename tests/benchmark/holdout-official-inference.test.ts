@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeF
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, beforeEach } from "vitest";
 
 import { runControlledEvaluation } from "@/lib/server/benchmark/holdout/evaluation";
 import {
@@ -18,6 +18,8 @@ import {
   officialFreezeRuntime,
   type InferenceFreezeManifest,
 } from "@/lib/server/benchmark/holdout/freeze";
+import { observeOfficialProviderBoundary } from "@/lib/server/benchmark/holdout/provider-identity";
+import { applyProtocolProviderEnv, setupOfficialTwoStage, withCustodianHomeAsync } from "../helpers/official-holdout-protocol";
 import {
   canonicalWorkspaceRoot,
   readCanonicalWorkspaceGit,
@@ -41,6 +43,10 @@ import {
 } from "../helpers/scripted-review-model";
 
 const workspace = canonicalWorkspaceRoot();
+
+beforeEach(() => {
+  applyProtocolProviderEnv();
+});
 
 function tempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -99,7 +105,10 @@ function synthesizeOfficialFreezeDocument(
       output_schema_version: OUTPUT_SCHEMA_VERSION,
     },
     assets: hashFreezeAssets(),
-    runtime: officialFreezeRuntime(),
+    runtime: {
+      ...officialFreezeRuntime(),
+      ...observeOfficialProviderBoundary(),
+    },
     ...overrides,
   };
   return reseal({
@@ -227,6 +236,7 @@ describe("official workspace trust boundary", () => {
       await expect(
         runOfficialBlindInference({
           freeze,
+          runFreeze: { run_freeze_id: "0".repeat(64) } as never,
           inputPack,
           model: officialModel(),
           artifactDir: tempDir("holdout-dirty-consume-"),
@@ -241,6 +251,7 @@ describe("official workspace trust boundary", () => {
           schema_version: "holdout-prediction.v1",
           prediction_id: "x",
           freeze_id: freeze.freeze_id,
+          run_freeze_id: null,
           input_pack_id: "protocol-fixture-v1",
           input_content_sha256: "y",
           role: "protocol_fixture",
@@ -264,6 +275,7 @@ describe("official workspace trust boundary", () => {
           schema_version: "holdout-prediction.v1",
           prediction_id: "x",
           freeze_id: freeze.freeze_id,
+          run_freeze_id: null,
           input_pack_id: "protocol-fixture-v1",
           input_content_sha256: "y",
           role: "protocol_fixture",
@@ -428,22 +440,24 @@ describe("official blind inference", () => {
     const live = readCanonicalWorkspaceGit();
     const freeze = synthesizeOfficialFreezeDocument();
     const artifactDir = tempDir("holdout-official-provenance-");
+    const badModel = officialModel(
+      officialSuccessProvenance([
+        officialAttempt({
+          attempt: 1,
+          outcome: "retryable_failure",
+          observed_response_model: null,
+          error: "empty",
+        }),
+        officialAttempt({ attempt: 2 }),
+      ]),
+    );
     if (live.dirty) {
       await expect(
         runOfficialBlindInference({
           freeze,
+          runFreeze: { run_freeze_id: "0".repeat(64) } as never,
           inputPack: writeExternalLockedInput(),
-          model: officialModel(
-            officialSuccessProvenance([
-              officialAttempt({
-                attempt: 1,
-                outcome: "retryable_failure",
-                observed_response_model: null,
-                error: "empty",
-              }),
-              officialAttempt({ attempt: 2 }),
-            ]),
-          ),
+          model: badModel,
           artifactDir,
         }),
       ).rejects.toThrow(/dirty/);
@@ -451,25 +465,19 @@ describe("official blind inference", () => {
       return;
     }
 
-    await expect(
-      runOfficialBlindInference({
-        freeze,
-        inputPack: writeExternalLockedInput(),
-        model: officialModel(
-          officialSuccessProvenance([
-            officialAttempt({
-              attempt: 1,
-              outcome: "retryable_failure",
-              observed_response_model: null,
-              error: "empty",
-            }),
-            officialAttempt({ attempt: 2 }),
-          ]),
-        ),
-        artifactDir,
-      }),
-    ).rejects.toThrow(/response model was not reported on attempt 1/);
-    expect(predictionFiles(artifactDir)).toEqual([]);
+    await withCustodianHomeAsync(async () => {
+      const setup = setupOfficialTwoStage({ artifactDir });
+      await expect(
+        runOfficialBlindInference({
+          freeze: setup.systemFreeze,
+          runFreeze: setup.runFreeze,
+          inputPack: setup.inputPack,
+          model: badModel,
+          artifactDir,
+        }),
+      ).rejects.toThrow(/response model was not reported on attempt 1/);
+      expect(predictionFiles(artifactDir)).toEqual([]);
+    });
   });
 
   test("scripted official locked inference is executable only on a clean canonical workspace", async () => {
@@ -486,6 +494,7 @@ describe("official blind inference", () => {
       await expect(
         runOfficialBlindInference({
           freeze: synthesizeOfficialFreezeDocument(),
+          runFreeze: { run_freeze_id: "0".repeat(64) } as never,
           inputPack,
           model: officialModel(),
           artifactDir,
@@ -495,23 +504,24 @@ describe("official blind inference", () => {
       return;
     }
 
-    const freeze = createInferenceFreeze({
-      purpose: "official",
-      runtime: officialFreezeRuntime(),
+    await withCustodianHomeAsync(async () => {
+      const setup = setupOfficialTwoStage({ artifactDir });
+      const prediction = await runOfficialBlindInference({
+        freeze: setup.systemFreeze,
+        runFreeze: setup.runFreeze,
+        inputPack: setup.inputPack,
+        model: officialModel(),
+        artifactDir,
+      });
+      expect(prediction.official).toBe(true);
+      expect(prediction.claim).toBe("official_locked");
+      expect(prediction.role).toBe("locked");
+      expect(prediction.freeze_id).toBe(setup.systemFreeze.freeze_id);
+      expect(prediction.run_freeze_id).toBe(setup.runFreeze.run_freeze_id);
+      expect(prediction.articles).toHaveLength(1);
+      expect(prediction.articles[0]?.provenance.attempts[0]?.observed_response_model).toBe(
+        OFFICIAL_BENCHMARK_MODEL,
+      );
     });
-    const prediction = await runOfficialBlindInference({
-      freeze,
-      inputPack,
-      model: officialModel(),
-      artifactDir,
-    });
-    expect(prediction.official).toBe(true);
-    expect(prediction.claim).toBe("official_locked");
-    expect(prediction.role).toBe("locked");
-    expect(prediction.freeze_id).toBe(freeze.freeze_id);
-    expect(prediction.articles).toHaveLength(1);
-    expect(prediction.articles[0]?.provenance.attempts[0]?.observed_response_model).toBe(
-      OFFICIAL_BENCHMARK_MODEL,
-    );
   });
 });

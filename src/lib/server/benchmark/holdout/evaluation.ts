@@ -32,6 +32,10 @@ import {
   type HoldoutRegistry,
   type HoldoutRegistryEntry,
 } from "@/lib/server/benchmark/holdout/lifecycle";
+import {
+  assertOfficialRunFreezeUsable,
+  loadPersistedRunFreeze,
+} from "@/lib/server/benchmark/holdout/run-freeze";
 import { assertNotOfficialLockedClaim, claimForRole, type ResultClaim } from "@/lib/server/benchmark/holdout/roles";
 import { hashCanonicalArticle } from "@/lib/server/quality/article-hash";
 
@@ -43,6 +47,7 @@ export type HoldoutResultManifest = {
   official: boolean;
   claim: ResultClaim;
   freeze_id: string;
+  run_freeze_id: string | null;
   prediction_id: string;
   prediction_artifact_sha256: string;
   input_pack_id: string;
@@ -294,6 +299,24 @@ export function runControlledEvaluation(options: ControlledEvaluationOptions): {
       `Prediction freeze_id ${prediction.freeze_id} does not match freeze ${freeze.freeze_id}`,
     );
   }
+  if (official) {
+    if (!prediction.run_freeze_id) {
+      throw new HoldoutProtocolError("Official evaluation is missing a Run Freeze identity");
+    }
+    const runFreeze = loadPersistedRunFreeze(options.artifactDir, prediction.run_freeze_id);
+    if (runFreeze.system_freeze_id !== freeze.freeze_id) {
+      throw new HoldoutProtocolError("System Freeze identity does not match Run Freeze");
+    }
+    if (runFreeze.holdout_id !== options.holdoutId) {
+      throw new HoldoutProtocolError("Holdout identity does not match Run Freeze");
+    }
+    assertOfficialRunFreezeUsable({
+      runFreeze,
+      systemFreeze: freeze,
+      inputPack: options.inputPack,
+      artifactDir: options.artifactDir,
+    });
+  }
   if (prediction.role !== options.goldPack.role) {
     throw new HoldoutProtocolError(
       `Gold role ${options.goldPack.role} does not match prediction role ${prediction.role}`,
@@ -384,6 +407,7 @@ export function runControlledEvaluation(options: ControlledEvaluationOptions): {
       official,
       claim,
       freeze_id: freeze.freeze_id,
+      run_freeze_id: prediction.run_freeze_id,
       prediction_id: prediction.prediction_id,
       prediction_artifact_sha256: predictionArtifactSha256,
       input_pack_id: prediction.input_pack_id,

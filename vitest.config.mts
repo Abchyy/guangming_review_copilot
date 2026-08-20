@@ -20,6 +20,7 @@ export default defineConfig({
       "tests/live/**",
       "tests/benchmark/holdout-chdir-probe.test.ts",
       "tests/benchmark/holdout-consume-race-probe.test.ts",
+      "tests/benchmark/holdout-pre-inference-probe.test.ts",
     ],
     setupFiles: ["./tests/setup.ts"],
   },

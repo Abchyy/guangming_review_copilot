@@ -15,33 +15,44 @@
 
 未来正式 hidden gold **不得**进入本开发仓库，也不得进入开发 Agent context。
 
-## 何时可以创建 inference freeze
+## 何时可以创建 System Freeze 与 Run Freeze
 
 正式路径的 workspace identity 在 runtime 建立时冻结一次：从已加载源码定位仓库根目录并做 realpath 规范化。之后 `process.chdir()` 不能改变 Git observation、freeze 资产哈希、in-repo 判定，以及 rules / corpus 等 inference 资产的加载根。`createInferenceFreeze`、`runOfficialBlindInference` 和正式 controlled evaluation 若发现当前 cwd 已偏离该 canonical workspace，会 fail-closed，而不会跟随新的 cwd。调用方也不能传入 `repoRoot` / `git` 把检查切到另一个 checkout，或替换 Git observation provider。
 
-`createInferenceFreeze({ purpose: "official" })` 会绑定：
+`createOfficialSystemFreeze({ artifactDir })` 会在任何 inference 之前持久化 **System Freeze**。它冻结被评估系统本身，且不依赖尚未存在的 `holdout_id` / `article_ids`：
 
 - 上述 canonical workspace 的 Git commit（工作树必须干净）
 - Prompt / schema、rules catalog、corpus、evaluator、检索与融合链路、provider adapter 的**内容哈希**
 - provider / requested model / cache / retry 等关键调用配置
+- **provider endpoint identity**（从运行时配置观察，调用方不能注入）
+- **provider/account boundary identity**（credential 的稳定非秘密哈希；明文 secret 不得写入 artifact）
 - `package-lock.json`
 
-版本字符串只是标签。身份以内容哈希为准。工作树 dirty、资产漂移、官方 freeze 开启应用层 cache、或 provider/model 与官方基准不一致，都会 fail-closed。
+版本字符串只是标签。身份以内容哈希为准。工作树 dirty、资产漂移、官方 freeze 开启应用层 cache、provider/model 与官方基准不一致、或 endpoint/account 无法观察，都会 fail-closed。
 
-消费 official freeze（blind inference 或后续正式阶段）时不能只相信 self-hash。必须再次证明：资产集合完整且未被替换、runtime 仍符合官方合同、内容身份未漂移、并且运行的是被冻结的 clean 系统状态。Git commit / dirty 判断只来自 canonical workspace 的内部 `git` 查询。
+fresh hidden holdout 由 custodian 在 `HOLDOUT_CUSTODIAN_HOME` 下创建之后，`createOfficialRunFreeze` 会在任何模型调用之前持久化 **Run Freeze**。它绑定：
 
-`purpose: "protocol_dry_run"` 允许 dirty 工作树，但结果不能标记为 official locked。
+- 不可变 System Freeze identity
+- holdout / input-pack identity
+- lifecycle identity（不含 status / result_id）
+- custodian boundary（`HOLDOUT_CUSTODIAN_HOME` 的 realpath + 唯一 lifecycle 路径）
+- 本次正式 runtime 观察到的 provider endpoint / account boundary（必须与 System Freeze 一致，不能改写系统身份）
+
+消费 official freeze（blind inference 或后续正式阶段）时不能只相信 self-hash。必须再次证明：已持久化的 System Freeze 与 Run Freeze 都在、资产集合完整且未被替换、runtime / endpoint / account 仍符合官方合同、holdout / lifecycle / custodian 身份闭合，并且运行的是被冻结的 clean 系统状态。Git commit / dirty 判断只来自 canonical workspace 的内部 `git` 查询。
+
+`purpose: "protocol_dry_run"` 允许 dirty 工作树，且不走两阶段官方冻结；其结果不能标记为 official locked。
 
 ## Blind inference 与 evaluation 如何分离
 
-1. **Inference Freeze**：冻结系统身份。
-2. **Hidden Holdout**：只把 input pack（无 gold）交给开发侧。
-3. **Blind Inference**：`runBlindInference` 只读 freeze + input，写出 sealed prediction 与 provenance。该模块不得加载 gold / evaluator。
-   对 repo 外的 input-only `locked` pack，`runOfficialBlindInference` 是正式可执行路径：消费时重新验证 official freeze 合同，并用 Repair 3 的 runtime provenance gate fail-closed。
-4. **Sealed Prediction**：已有 artifact 不得覆盖。正式 prediction 仅在实际 provider-response provenance 满足官方基准时才能落盘。
-5. **Independent Evaluation**：`runControlledEvaluation` 读取 sealed prediction + hidden gold + 冻结 evaluator，写出 result manifest。正式路径必须从磁盘上的 sealed prediction 文件加载并重算 identity / 文件哈希，不能用调用方内存对象作为 fallback。
-6. **Result Freeze**：manifest 记录 freeze / prediction / input / gold / evaluator / 指标。
-7. **Consumed**：评测后 holdout 变为 `consumed`，不得再当作新版本系统的独立 locked 泛化证据。
+1. **System Freeze**：冻结被评估系统身份，并在 inference 之前独立持久化。
+2. **Hidden Holdout**：custodian 创建 fresh hidden holdout；只把 input pack（无 gold）交给开发侧。
+3. **Run Freeze**：绑定 System Freeze、holdout、lifecycle 与 custodian，并在任何模型调用之前持久化。
+4. **Blind Inference**：`runBlindInference` 只读 freeze + input，写出 sealed prediction 与 provenance。该模块不得加载 gold / evaluator。
+   对 repo 外的 input-only `locked` pack，`runOfficialBlindInference` 是正式可执行路径：消费前必须存在已验证的 System Freeze 与 Run Freeze，并用 Repair 3 的 runtime provenance gate fail-closed。
+5. **Sealed Prediction**：已有 artifact 不得覆盖。正式 prediction 仅在实际 provider-response provenance 满足官方基准时才能落盘。
+6. **Independent Evaluation**：`runControlledEvaluation` 读取 sealed prediction + hidden gold + 冻结 evaluator，写出 result manifest。正式路径必须从磁盘上的 sealed prediction 文件加载并重算 identity / 文件哈希，不能用调用方内存对象作为 fallback。
+7. **Result Freeze**：manifest 记录 freeze / run freeze / prediction / input / gold / evaluator / 指标。
+8. **Consumed**：评测后 holdout 变为 `consumed`，不得再当作新版本系统的独立 locked 泛化证据。
 
 正式 official evaluation 的 gold 路径必须在开发 repo 之外。
 

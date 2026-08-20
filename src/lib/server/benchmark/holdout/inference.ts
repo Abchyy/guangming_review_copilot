@@ -9,12 +9,17 @@ import {
   assertFreezeIntegrity,
   assertFreezeMatchesWorkspace,
   assertOfficialFreezeUsable,
+  loadPersistedSystemFreeze,
   type InferenceFreezeManifest,
 } from "@/lib/server/benchmark/holdout/freeze";
 import { rejectCallerWorkspaceOverride, assertCanonicalProcessCwd } from "@/lib/server/benchmark/holdout/git-state";
 import { sha256Canonical } from "@/lib/server/benchmark/holdout/identity";
 import type { InputPack } from "@/lib/server/benchmark/holdout/input-pack";
 import { claimForRole, type ResultClaim } from "@/lib/server/benchmark/holdout/roles";
+import {
+  assertOfficialRunFreezeUsable,
+  type RunFreezeManifest,
+} from "@/lib/server/benchmark/holdout/run-freeze";
 import { snapshotFromProvenance, type CallRuntimeSnapshot } from "@/lib/server/benchmark/runtime-report";
 import { assertOfficialBenchmarkProvenance } from "@/lib/server/llm/provenance";
 import type { ReviewModel } from "@/lib/server/llm/review-model";
@@ -36,6 +41,7 @@ export type SealedPrediction = {
   schema_version: typeof PREDICTION_SCHEMA_VERSION;
   prediction_id: string;
   freeze_id: string;
+  run_freeze_id: string | null;
   input_pack_id: string;
   input_content_sha256: string;
   role: InputPack["role"];
@@ -47,6 +53,7 @@ export type SealedPrediction = {
 
 export type BlindInferenceOptions = {
   freeze: InferenceFreezeManifest;
+  runFreeze?: RunFreezeManifest;
   inputPack: InputPack;
   model: ReviewModel;
   artifactDir: string;
@@ -56,6 +63,7 @@ export type BlindInferenceOptions = {
 
 export function predictionIdentity(input: {
   freeze_id: string;
+  run_freeze_id: string | null;
   input_pack_id: string;
   input_content_sha256: string;
   role: SealedPrediction["role"];
@@ -71,6 +79,7 @@ export function predictionIdentity(input: {
 }): string {
   return sha256Canonical({
     freeze_id: input.freeze_id,
+    run_freeze_id: input.run_freeze_id,
     input_pack_id: input.input_pack_id,
     input_content_sha256: input.input_content_sha256,
     role: input.role,
@@ -90,6 +99,7 @@ const sealedPredictionSchema = z.object({
   schema_version: z.literal(PREDICTION_SCHEMA_VERSION),
   prediction_id: z.string().regex(/^[0-9a-f]{64}$/),
   freeze_id: z.string().min(1),
+  run_freeze_id: z.union([z.string().regex(/^[0-9a-f]{64}$/), z.null()]),
   input_pack_id: z.string().min(1),
   input_content_sha256: z.string().regex(/^[0-9a-f]{64}$/),
   role: z.enum(["dev", "regression", "locked", "protocol_fixture"]),
@@ -155,7 +165,7 @@ export function assertOfficialInferenceProvenance(provenance: ReviewExecutionPro
 }
 
 export async function runOfficialBlindInference(
-  options: Omit<BlindInferenceOptions, "verifyWorkspace">,
+  options: Omit<BlindInferenceOptions, "verifyWorkspace"> & { runFreeze: RunFreezeManifest },
 ): Promise<SealedPrediction> {
   rejectCallerWorkspaceOverride(options);
   assertCanonicalProcessCwd();
@@ -174,8 +184,25 @@ export async function runBlindInference(options: BlindInferenceOptions): Promise
       throw new HoldoutProtocolError("Official freeze consumption cannot skip workspace verification");
     }
   }
+  let boundRunFreeze: RunFreezeManifest | null = null;
   const freeze = officialPath
-    ? assertOfficialFreezeUsable(options.freeze)
+    ? (() => {
+        const usable = assertOfficialFreezeUsable(options.freeze);
+        if (!options.runFreeze) {
+          throw new HoldoutProtocolError("Official inference is missing a Run Freeze");
+        }
+        const persisted = loadPersistedSystemFreeze(options.artifactDir, usable.freeze_id);
+        if (persisted.freeze_id !== usable.freeze_id) {
+          throw new HoldoutProtocolError("System Freeze identity does not match the persisted System Freeze");
+        }
+        boundRunFreeze = assertOfficialRunFreezeUsable({
+          runFreeze: options.runFreeze,
+          systemFreeze: usable,
+          inputPack: options.inputPack,
+          artifactDir: options.artifactDir,
+        });
+        return usable;
+      })()
     : assertFreezeIntegrity(options.freeze);
 
   if (officialPath) {
@@ -228,9 +255,19 @@ export async function runBlindInference(options: BlindInferenceOptions): Promise
   if (officialPath && !official) {
     throw new HoldoutProtocolError("Official locked inference did not produce an official_locked claim");
   }
+  if (official) {
+    if (!boundRunFreeze) {
+      throw new HoldoutProtocolError("Official inference is missing a Run Freeze");
+    }
+    if (boundRunFreeze.system_freeze_id !== freeze.freeze_id) {
+      throw new HoldoutProtocolError("System Freeze identity does not match Run Freeze");
+    }
+  }
+  const runFreezeId = official && boundRunFreeze ? boundRunFreeze.run_freeze_id : null;
   const body: Omit<SealedPrediction, "prediction_id" | "created_at"> = {
     schema_version: PREDICTION_SCHEMA_VERSION,
     freeze_id: freeze.freeze_id,
+    run_freeze_id: runFreezeId,
     input_pack_id: options.inputPack.pack_id,
     input_content_sha256: options.inputPack.content_sha256,
     role: options.inputPack.role,
@@ -244,7 +281,9 @@ export async function runBlindInference(options: BlindInferenceOptions): Promise
     created_at: options.createdAt ?? new Date().toISOString(),
   };
 
-  writeSealedJson(sealedArtifactPath(options.artifactDir, "freeze", freeze.freeze_id), freeze);
+  if (!officialPath) {
+    writeSealedJson(sealedArtifactPath(options.artifactDir, "freeze", freeze.freeze_id), freeze);
+  }
   writeSealedJson(sealedArtifactPath(options.artifactDir, "prediction", prediction.prediction_id), prediction);
   return prediction;
 }

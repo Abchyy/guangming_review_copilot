@@ -3,9 +3,14 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
+import { readJsonFile, sealedArtifactPath, writeSealedJson } from "@/lib/server/benchmark/holdout/artifacts";
 import { HoldoutProtocolError } from "@/lib/server/benchmark/holdout/errors";
 import { sha256Canonical, sha256FileAt } from "@/lib/server/benchmark/holdout/identity";
 import { canonicalWorkspaceRoot, readCanonicalWorkspaceGit, rejectCallerWorkspaceOverride, assertCanonicalProcessCwd, type GitSnapshot } from "@/lib/server/benchmark/holdout/git-state";
+import {
+  assertArtifactContainsNoSecrets,
+  observeOfficialProviderBoundary,
+} from "@/lib/server/benchmark/holdout/provider-identity";
 import {
   OFFICIAL_BENCHMARK_MODEL,
   OFFICIAL_BENCHMARK_PROVIDER,
@@ -14,6 +19,7 @@ import { DEEPSEEK_RETRY_POLICY } from "@/lib/server/llm/deepseek-review-model";
 import { OUTPUT_SCHEMA_VERSION, PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { getCorpusVersion } from "@/lib/server/quality/corpus";
 import { getRuleVersion } from "@/lib/server/quality/rules";
+import { getDeepSeekApiKey } from "@/lib/server/config";
 import type { ReviewProvider } from "@/lib/contracts/review";
 import type { FreezePurpose } from "@/lib/server/benchmark/holdout/roles";
 
@@ -58,6 +64,8 @@ export type FreezeRuntimeConfig = {
     timeout_ms: number | null;
     max_tokens: number | null;
   };
+  provider_endpoint: string | null;
+  account_boundary_id: string | null;
 };
 
 export type InferenceFreezeManifest = {
@@ -77,6 +85,8 @@ export type InferenceFreezeManifest = {
   runtime: FreezeRuntimeConfig;
 };
 
+export type SystemFreezeManifest = InferenceFreezeManifest;
+
 export type CreateFreezeOptions = {
   purpose: FreezePurpose;
   runtime: FreezeRuntimeConfig;
@@ -94,6 +104,8 @@ function defaultOfficialRuntime(): FreezeRuntimeConfig {
       timeout_ms: DEEPSEEK_RETRY_POLICY.timeout_ms,
       max_tokens: DEEPSEEK_RETRY_POLICY.max_tokens,
     },
+    provider_endpoint: null,
+    account_boundary_id: null,
   };
 }
 
@@ -179,6 +191,8 @@ const freezeManifestSchema = z.object({
       timeout_ms: z.number().int().positive().nullable(),
       max_tokens: z.number().int().positive().nullable(),
     }),
+    provider_endpoint: z.string().min(1).nullable(),
+    account_boundary_id: z.union([sha256Schema, z.null()]),
   }),
 });
 
@@ -190,7 +204,7 @@ export function parseFreezeManifest(raw: unknown): InferenceFreezeManifest {
   return parsed.data;
 }
 
-export function assertOfficialRuntime(runtime: FreezeRuntimeConfig): void {
+export function assertOfficialRuntimePolicy(runtime: FreezeRuntimeConfig): void {
   if (runtime.adapter_provider !== OFFICIAL_BENCHMARK_PROVIDER) {
     throw new HoldoutProtocolError(
       `Refusing official freeze: adapter provider ${runtime.adapter_provider} !== ${OFFICIAL_BENCHMARK_PROVIDER}`,
@@ -222,6 +236,45 @@ export function assertOfficialRuntime(runtime: FreezeRuntimeConfig): void {
       `Refusing official freeze: retry max_tokens ${runtime.retry.max_tokens} !== ${DEEPSEEK_RETRY_POLICY.max_tokens}`,
     );
   }
+}
+
+export function assertOfficialProviderBoundary(runtime: FreezeRuntimeConfig): void {
+  if (runtime.provider_endpoint == null || runtime.provider_endpoint.length === 0) {
+    throw new HoldoutProtocolError("Official freeze is missing provider endpoint identity");
+  }
+  if (runtime.account_boundary_id == null || !/^[0-9a-f]{64}$/.test(runtime.account_boundary_id)) {
+    throw new HoldoutProtocolError("Official freeze is missing provider account boundary identity");
+  }
+  const live = observeOfficialProviderBoundary();
+  if (runtime.provider_endpoint !== live.provider_endpoint) {
+    throw new HoldoutProtocolError(
+      `Official provider endpoint drifted: live ${live.provider_endpoint} !== freeze ${runtime.provider_endpoint}`,
+    );
+  }
+  if (runtime.account_boundary_id !== live.account_boundary_id) {
+    throw new HoldoutProtocolError("Official provider account boundary identity does not match the live credential");
+  }
+}
+
+export function assertOfficialRuntime(runtime: FreezeRuntimeConfig): void {
+  assertOfficialRuntimePolicy(runtime);
+  assertOfficialProviderBoundary(runtime);
+}
+
+function rejectCallerProviderBoundaryOverride(runtime: FreezeRuntimeConfig): void {
+  if (runtime.provider_endpoint != null || runtime.account_boundary_id != null) {
+    throw new HoldoutProtocolError(
+      "Official provider endpoint/account identity cannot be supplied by the caller",
+    );
+  }
+}
+
+function normalizeRuntime(runtime: FreezeRuntimeConfig): FreezeRuntimeConfig {
+  return {
+    ...runtime,
+    provider_endpoint: runtime.provider_endpoint ?? null,
+    account_boundary_id: runtime.account_boundary_id ?? null,
+  };
 }
 
 export function assertOfficialFreezeAssetInventory(assets: FreezeAssetIdentity[]): void {
@@ -272,6 +325,7 @@ export function createInferenceFreeze(options: CreateFreezeOptions): InferenceFr
   const git = readCanonicalWorkspaceGit();
   const purpose = options.purpose;
   const official = purpose === "official";
+  let runtime = normalizeRuntime(options.runtime);
 
   if (official) {
     if (git.dirty) {
@@ -279,7 +333,13 @@ export function createInferenceFreeze(options: CreateFreezeOptions): InferenceFr
         "Refusing official inference freeze: working tree is dirty. Commit or restore all changes first.",
       );
     }
-    assertOfficialRuntime(options.runtime);
+    assertOfficialRuntimePolicy(runtime);
+    rejectCallerProviderBoundaryOverride(options.runtime);
+    runtime = {
+      ...runtime,
+      ...observeOfficialProviderBoundary(),
+    };
+    assertOfficialProviderBoundary(runtime);
   }
 
   const manifestWithoutId: Omit<InferenceFreezeManifest, "freeze_id"> = {
@@ -295,13 +355,48 @@ export function createInferenceFreeze(options: CreateFreezeOptions): InferenceFr
       output_schema_version: OUTPUT_SCHEMA_VERSION,
     },
     assets: hashFreezeAssets(),
-    runtime: options.runtime,
+    runtime,
   };
 
-  return {
+  const freeze = {
     ...manifestWithoutId,
     freeze_id: freezeIdentity(manifestWithoutId),
   };
+  assertArtifactContainsNoSecrets(freeze, [getDeepSeekApiKey()]);
+  return freeze;
+}
+
+export const createSystemFreeze = createInferenceFreeze;
+
+export function persistSystemFreeze(artifactDir: string, freeze: InferenceFreezeManifest): string {
+  const parsed = assertFreezeIntegrity(freeze);
+  assertArtifactContainsNoSecrets(parsed, [getDeepSeekApiKey()]);
+  const filePath = sealedArtifactPath(artifactDir, "system-freeze", parsed.freeze_id);
+  writeSealedJson(filePath, parsed);
+  return filePath;
+}
+
+export function loadPersistedSystemFreeze(artifactDir: string, freezeId: string): InferenceFreezeManifest {
+  const filePath = sealedArtifactPath(artifactDir, "system-freeze", freezeId);
+  if (!existsSync(filePath)) {
+    throw new HoldoutProtocolError("Official inference is missing a persisted System Freeze");
+  }
+  return assertFreezeIntegrity(readJsonFile(filePath));
+}
+
+export function createOfficialSystemFreeze(options: {
+  artifactDir: string;
+  runtime?: Partial<FreezeRuntimeConfig>;
+  createdAt?: string;
+}): InferenceFreezeManifest {
+  rejectCallerWorkspaceOverride(options);
+  const freeze = createInferenceFreeze({
+    purpose: "official",
+    runtime: officialFreezeRuntime(options.runtime),
+    createdAt: options.createdAt,
+  });
+  persistSystemFreeze(options.artifactDir, freeze);
+  return freeze;
 }
 
 export function assertFreezeIntegrity(freeze: unknown): InferenceFreezeManifest {

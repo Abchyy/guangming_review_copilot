@@ -65,6 +65,7 @@ function placeholderPrediction(predictionId = "a".repeat(64)) {
     schema_version: "holdout-prediction.v1" as const,
     prediction_id: predictionId,
     freeze_id: "placeholder",
+    run_freeze_id: null,
     input_pack_id: "placeholder",
     input_content_sha256: "b".repeat(64),
     role: "locked" as const,

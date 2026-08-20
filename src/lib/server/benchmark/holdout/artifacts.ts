@@ -3,7 +3,9 @@ import { dirname, join } from "node:path";
 
 import { HoldoutProtocolError } from "@/lib/server/benchmark/holdout/errors";
 
-export function sealedArtifactPath(directory: string, kind: "freeze" | "prediction" | "result", id: string): string {
+export type SealedArtifactKind = "freeze" | "system-freeze" | "run-freeze" | "prediction" | "result";
+
+export function sealedArtifactPath(directory: string, kind: SealedArtifactKind, id: string): string {
   return join(directory, `${kind}-${id}.json`);
 }
 
