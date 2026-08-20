@@ -9,6 +9,10 @@ import {
   type ReviewExecutionProvenance,
 } from "@/lib/contracts/review";
 import {
+  observeOfficialProviderEndpoint,
+  providerAccountBoundaryId,
+} from "@/lib/server/benchmark/holdout/provider-identity";
+import {
   getDeepSeekApiKey,
   getDeepSeekBaseUrl,
   getReviewModelName,
@@ -18,6 +22,7 @@ import {
   buildHttpProvenance,
   extractObservedUsage,
   observedString,
+  OFFICIAL_BENCHMARK_MODEL,
   projectUsage,
 } from "@/lib/server/llm/provenance";
 import {
@@ -39,12 +44,22 @@ export const DEEPSEEK_RETRY_POLICY = {
   max_tokens: 8192,
 } as const;
 
+const CANONICAL_OFFICIAL = Symbol("canonicalOfficialDeepSeek");
+
 type DeepSeekReviewModelOptions = {
   apiKey?: string;
   baseURL?: string;
   model?: string;
   client?: OpenAI;
   timeoutMs?: number;
+  [CANONICAL_OFFICIAL]?: true;
+};
+
+export type OfficialDeepSeekExecutionBinding = {
+  provider: "deepseek";
+  requested_model: string;
+  provider_endpoint: string;
+  account_boundary_id: string;
 };
 
 type ChatCompletionsClient = {
@@ -84,6 +99,7 @@ function isRetryable(error: unknown): boolean {
 export class DeepSeekReviewModel implements ReviewModel {
   readonly provider = "deepseek" as const;
   readonly model: string;
+  readonly officialExecution: OfficialDeepSeekExecutionBinding | null;
   private readonly client: ChatCompletionsClient;
   private lastUsage: ProviderCallUsage | null = null;
   private lastProvenance: ReviewExecutionProvenance | null = null;
@@ -95,12 +111,36 @@ export class DeepSeekReviewModel implements ReviewModel {
     }
 
     this.model = options.model ?? getReviewModelName("deepseek");
+    const baseURL = options.baseURL ?? getDeepSeekBaseUrl();
     this.client = (options.client ??
       new OpenAI({
         apiKey,
-        baseURL: options.baseURL ?? getDeepSeekBaseUrl(),
+        baseURL,
         timeout: options.timeoutMs ?? DEEPSEEK_RETRY_POLICY.timeout_ms,
       })) as unknown as ChatCompletionsClient;
+    this.officialExecution =
+      options[CANONICAL_OFFICIAL] && !options.client && apiKey
+        ? {
+            provider: "deepseek",
+            requested_model: this.model,
+            provider_endpoint: baseURL,
+            account_boundary_id: providerAccountBoundaryId("deepseek", apiKey),
+          }
+        : null;
+  }
+
+  static createCanonicalOfficial(): DeepSeekReviewModel {
+    const apiKey = getDeepSeekApiKey();
+    if (!apiKey) {
+      throw new ReviewProviderError("DEEPSEEK_API_KEY is missing");
+    }
+    return new DeepSeekReviewModel({
+      apiKey,
+      baseURL: observeOfficialProviderEndpoint(),
+      model: OFFICIAL_BENCHMARK_MODEL,
+      timeoutMs: DEEPSEEK_RETRY_POLICY.timeout_ms,
+      [CANONICAL_OFFICIAL]: true,
+    });
   }
 
   consumeLastUsage(): ProviderCallUsage | null {

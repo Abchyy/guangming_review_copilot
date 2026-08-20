@@ -23,13 +23,8 @@ import { loadGoldPack } from "@/lib/server/benchmark/holdout/gold-pack";
 import { loadInputPack } from "@/lib/server/benchmark/holdout/input-pack";
 import { protocolFixtureRegistry } from "@/lib/server/benchmark/holdout/lifecycle";
 import { OUTPUT_SCHEMA_VERSION, PROMPT_VERSION } from "@/lib/server/llm/prompt";
-import { OFFICIAL_BENCHMARK_MODEL } from "@/lib/server/llm/provenance";
 import { getCorpusVersion } from "@/lib/server/quality/corpus";
 import { getRuleVersion } from "@/lib/server/quality/rules";
-import {
-  ScriptedReviewModel,
-  officialSuccessProvenance,
-} from "../helpers/scripted-review-model";
 
 function reseal(freeze: InferenceFreezeManifest): InferenceFreezeManifest {
   return {
@@ -107,11 +102,6 @@ describe("official cwd drift isolation", () => {
           freeze,
           runFreeze: { run_freeze_id: "0".repeat(64) } as never,
           inputPack,
-          model: new ScriptedReviewModel({
-            provider: "deepseek",
-            model: OFFICIAL_BENCHMARK_MODEL,
-            provenance: officialSuccessProvenance(),
-          }),
           artifactDir: other,
         }),
       ).rejects.toThrow(/process cwd is not the canonical workspace/);

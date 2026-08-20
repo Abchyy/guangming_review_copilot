@@ -20,6 +20,10 @@ import {
   assertOfficialRunFreezeUsable,
   type RunFreezeManifest,
 } from "@/lib/server/benchmark/holdout/run-freeze";
+import {
+  createOfficialFrozenDeepSeekModel,
+  rejectCallerOfficialProviderInjection,
+} from "@/lib/server/benchmark/holdout/official-provider";
 import { snapshotFromProvenance, type CallRuntimeSnapshot } from "@/lib/server/benchmark/runtime-report";
 import { assertOfficialBenchmarkProvenance } from "@/lib/server/llm/provenance";
 import type { ReviewModel } from "@/lib/server/llm/review-model";
@@ -55,7 +59,7 @@ export type BlindInferenceOptions = {
   freeze: InferenceFreezeManifest;
   runFreeze?: RunFreezeManifest;
   inputPack: InputPack;
-  model: ReviewModel;
+  model?: ReviewModel;
   artifactDir: string;
   createdAt?: string;
   verifyWorkspace?: boolean;
@@ -165,7 +169,7 @@ export function assertOfficialInferenceProvenance(provenance: ReviewExecutionPro
 }
 
 export async function runOfficialBlindInference(
-  options: Omit<BlindInferenceOptions, "verifyWorkspace"> & { runFreeze: RunFreezeManifest },
+  options: Omit<BlindInferenceOptions, "verifyWorkspace" | "model"> & { runFreeze: RunFreezeManifest },
 ): Promise<SealedPrediction> {
   rejectCallerWorkspaceOverride(options);
   assertCanonicalProcessCwd();
@@ -207,18 +211,24 @@ export async function runBlindInference(options: BlindInferenceOptions): Promise
 
   if (officialPath) {
     assertOfficialLockedInput(options.inputPack, freeze);
+    rejectCallerOfficialProviderInjection(options);
   } else if (options.verifyWorkspace !== false) {
     assertFreezeMatchesWorkspace(freeze);
   }
 
-  if (options.model.provider !== freeze.runtime.adapter_provider) {
+  const model = officialPath ? createOfficialFrozenDeepSeekModel(freeze) : options.model;
+  if (!model) {
+    throw new HoldoutProtocolError("Inference requires a ReviewModel");
+  }
+
+  if (model.provider !== freeze.runtime.adapter_provider) {
     throw new HoldoutProtocolError(
-      `Inference provider ${options.model.provider} does not match freeze ${freeze.runtime.adapter_provider}`,
+      `Inference provider ${model.provider} does not match freeze ${freeze.runtime.adapter_provider}`,
     );
   }
-  if (options.model.model !== freeze.runtime.requested_model) {
+  if (model.model !== freeze.runtime.requested_model) {
     throw new HoldoutProtocolError(
-      `Requested model ${options.model.model} does not match freeze ${freeze.runtime.requested_model}`,
+      `Requested model ${model.model} does not match freeze ${freeze.runtime.requested_model}`,
     );
   }
 
@@ -226,7 +236,7 @@ export async function runBlindInference(options: BlindInferenceOptions): Promise
   for (const article of options.inputPack.articles) {
     const snapshot = await createReview(
       { title: article.title, body: article.body },
-      options.model,
+      model,
       {
         promptMode: freeze.runtime.prompt_mode,
         useCache: freeze.runtime.application_cache.enabled,

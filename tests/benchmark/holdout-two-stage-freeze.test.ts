@@ -34,10 +34,9 @@ import {
   observeOfficialProviderBoundary,
   providerAccountBoundaryId,
 } from "@/lib/server/benchmark/holdout/provider-identity";
-import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
 import { DEFAULT_DEEPSEEK_BASE_URL } from "@/lib/server/config";
 import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
-import { OFFICIAL_BENCHMARK_MODEL } from "@/lib/server/llm/provenance";
+import { installCanonicalProviderRequestProbe } from "../helpers/canonical-provider-request-probe";
 import {
   PROTOCOL_TEST_PROVIDER_KEY,
   applyProtocolProviderEnv,
@@ -48,7 +47,6 @@ import {
   withProtocolProviderEnvAsync,
   writeExternalLockedInput,
 } from "../helpers/official-holdout-protocol";
-import { ScriptedReviewModel, officialSuccessProvenance } from "../helpers/scripted-review-model";
 
 function tempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -207,18 +205,12 @@ describe("two-stage freeze protocol", () => {
 
       await withCustodianHomeAsync(async () => {
         const setup = setupOfficialTwoStage();
-        const model = new ScriptedReviewModel({
-          provider: "deepseek",
-          model: OFFICIAL_BENCHMARK_MODEL,
-          provenance: officialSuccessProvenance(),
-        });
 
         await expect(
           runOfficialBlindInference({
             freeze: setup.systemFreeze,
             runFreeze: { run_freeze_id: "0".repeat(64) } as never,
             inputPack: setup.inputPack,
-            model,
             artifactDir: setup.artifactDir,
           }),
         ).rejects.toThrow(/Run Freeze|does not satisfy/);
@@ -230,7 +222,6 @@ describe("two-stage freeze protocol", () => {
             freeze: setup.systemFreeze,
             runFreeze: setup.runFreeze,
             inputPack: setup.inputPack,
-            model,
             artifactDir: otherDir,
           }),
         ).rejects.toThrow(/missing a persisted Run Freeze/);
@@ -244,7 +235,6 @@ describe("two-stage freeze protocol", () => {
             freeze: inMemoryOnly,
             runFreeze: setup.runFreeze,
             inputPack: setup.inputPack,
-            model,
             artifactDir: tempDir("holdout-missing-persist-"),
           }),
         ).rejects.toThrow(/missing a persisted System Freeze/);
@@ -301,7 +291,7 @@ describe("two-stage freeze protocol", () => {
     );
   });
 
-  test("in-process legal path reaches DeepSeekReviewModel.completions.create before any prediction", async () => {
+  test("in-process legal path reaches the canonical DeepSeek request boundary before any prediction", async () => {
     if (skipIfDirty()) {
       return;
     }
@@ -309,30 +299,22 @@ describe("two-stage freeze protocol", () => {
     await withProtocolProviderEnvAsync(async () => {
       await withCustodianHomeAsync(async () => {
         const setup = setupOfficialTwoStage();
-        const reached = { value: false };
-        const model = new DeepSeekReviewModel({
-          apiKey: PROTOCOL_TEST_PROVIDER_KEY,
-          client: {
-            chat: {
-              completions: {
-                create: async () => {
-                  reached.value = true;
-                  throw new Error("PROVIDER_CALL_BOUNDARY");
-                },
-              },
-            },
-          } as never,
-        });
-        await expect(
-          runOfficialBlindInference({
-            freeze: setup.systemFreeze,
-            runFreeze: setup.runFreeze,
-            inputPack: setup.inputPack,
-            model,
-            artifactDir: setup.artifactDir,
-          }),
-        ).rejects.toThrow(/PROVIDER_CALL_BOUNDARY|DeepSeek provider unavailable/);
-        expect(reached.value).toBe(true);
+        const probe = installCanonicalProviderRequestProbe();
+        try {
+          await expect(
+            runOfficialBlindInference({
+              freeze: setup.systemFreeze,
+              runFreeze: setup.runFreeze,
+              inputPack: setup.inputPack,
+              artifactDir: setup.artifactDir,
+            }),
+          ).rejects.toThrow(/CANONICAL_PROVIDER_REQUEST_BOUNDARY|DeepSeek provider unavailable/);
+          expect(probe.requests.length).toBeGreaterThan(0);
+          expect(probe.requests[0]?.origin).toBe(setup.systemFreeze.runtime.provider_endpoint);
+          expect(probe.requests[0]?.account_boundary_id).toBe(setup.systemFreeze.runtime.account_boundary_id);
+        } finally {
+          probe.restore();
+        }
         expect(predictionFiles(setup.artifactDir)).toEqual([]);
       });
     });
@@ -345,6 +327,7 @@ describe("two-stage freeze protocol", () => {
     );
     expect(source.indexOf("assertOfficialRunFreezeUsable")).toBeGreaterThan(0);
     expect(source.indexOf("assertOfficialRunFreezeUsable")).toBeLessThan(source.indexOf("createReview("));
+    expect(source.indexOf("createOfficialFrozenDeepSeekModel")).toBeLessThan(source.indexOf("createReview("));
     expect(source.indexOf("loadPersistedSystemFreeze")).toBeLessThan(source.indexOf("createReview("));
     expect(source).not.toMatch(/gold-pack|loadGoldPack|evaluateReview|loadBenchmarkDataset/);
   });

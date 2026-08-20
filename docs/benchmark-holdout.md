@@ -48,7 +48,7 @@ fresh hidden holdout 由 custodian 在 `HOLDOUT_CUSTODIAN_HOME` 下创建之后�
 2. **Hidden Holdout**：custodian 创建 fresh hidden holdout；只把 input pack（无 gold）交给开发侧。
 3. **Run Freeze**：绑定 System Freeze、holdout、lifecycle 与 custodian，并在任何模型调用之前持久化。
 4. **Blind Inference**：`runBlindInference` 只读 freeze + input，写出 sealed prediction 与 provenance。该模块不得加载 gold / evaluator。
-   对 repo 外的 input-only `locked` pack，`runOfficialBlindInference` 是正式可执行路径：消费前必须存在已验证的 System Freeze 与 Run Freeze，并用 Repair 3 的 runtime provenance gate fail-closed。
+   对 repo 外的 input-only `locked` pack，`runOfficialBlindInference` 是正式可执行路径：消费前必须存在已验证的 System Freeze 与 Run Freeze，**不得**接受 caller-supplied ReviewModel / client / baseURL / apiKey。正式路径自行构造 canonical DeepSeek adapter，使其 HTTP client 绑定冻结的 endpoint 与 account boundary，并用 Repair 3 的 runtime provenance gate fail-closed。
 5. **Sealed Prediction**：已有 artifact 不得覆盖。正式 prediction 仅在实际 provider-response provenance 满足官方基准时才能落盘。
 6. **Independent Evaluation**：`runControlledEvaluation` 读取 sealed prediction + hidden gold + 冻结 evaluator，写出 result manifest。正式路径必须从磁盘上的 sealed prediction 文件加载并重算 identity / 文件哈希，不能用调用方内存对象作为 fallback。
 7. **Result Freeze**：manifest 记录 freeze / run freeze / prediction / input / gold / evaluator / 指标。

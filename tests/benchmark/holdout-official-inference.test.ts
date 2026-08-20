@@ -213,7 +213,6 @@ describe("official workspace trust boundary", () => {
       runOfficialBlindInference({
         freeze,
         inputPack,
-        model: officialModel(),
         artifactDir,
         git: fakeCleanGit,
       } as never),
@@ -224,7 +223,6 @@ describe("official workspace trust boundary", () => {
       runOfficialBlindInference({
         freeze,
         inputPack,
-        model: officialModel(),
         artifactDir,
         repoRoot: otherWorkspace,
       } as never),
@@ -238,7 +236,6 @@ describe("official workspace trust boundary", () => {
           freeze,
           runFreeze: { run_freeze_id: "0".repeat(64) } as never,
           inputPack,
-          model: officialModel(),
           artifactDir: tempDir("holdout-dirty-consume-"),
         }),
       ).rejects.toThrow(/dirty/);
@@ -459,7 +456,7 @@ describe("official blind inference", () => {
           inputPack: writeExternalLockedInput(),
           model: badModel,
           artifactDir,
-        }),
+        } as never),
       ).rejects.toThrow(/dirty/);
       expect(predictionFiles(artifactDir)).toEqual([]);
       return;
@@ -474,13 +471,13 @@ describe("official blind inference", () => {
           inputPack: setup.inputPack,
           model: badModel,
           artifactDir,
-        }),
-      ).rejects.toThrow(/response model was not reported on attempt 1/);
+        } as never),
+      ).rejects.toThrow(/caller-supplied ReviewModel/);
       expect(predictionFiles(artifactDir)).toEqual([]);
     });
   });
 
-  test("scripted official locked inference is executable only on a clean canonical workspace", async () => {
+  test("scripted official locked inference cannot mint an official_locked prediction", async () => {
     const live = readCanonicalWorkspaceGit();
     const inputPack = writeExternalLockedInput();
     const artifactDir = tempDir("holdout-official-run-");
@@ -498,7 +495,7 @@ describe("official blind inference", () => {
           inputPack,
           model: officialModel(),
           artifactDir,
-        }),
+        } as never),
       ).rejects.toThrow(/dirty/);
       expect(predictionFiles(artifactDir)).toEqual([]);
       return;
@@ -506,22 +503,16 @@ describe("official blind inference", () => {
 
     await withCustodianHomeAsync(async () => {
       const setup = setupOfficialTwoStage({ artifactDir });
-      const prediction = await runOfficialBlindInference({
-        freeze: setup.systemFreeze,
-        runFreeze: setup.runFreeze,
-        inputPack: setup.inputPack,
-        model: officialModel(),
-        artifactDir,
-      });
-      expect(prediction.official).toBe(true);
-      expect(prediction.claim).toBe("official_locked");
-      expect(prediction.role).toBe("locked");
-      expect(prediction.freeze_id).toBe(setup.systemFreeze.freeze_id);
-      expect(prediction.run_freeze_id).toBe(setup.runFreeze.run_freeze_id);
-      expect(prediction.articles).toHaveLength(1);
-      expect(prediction.articles[0]?.provenance.attempts[0]?.observed_response_model).toBe(
-        OFFICIAL_BENCHMARK_MODEL,
-      );
+      await expect(
+        runOfficialBlindInference({
+          freeze: setup.systemFreeze,
+          runFreeze: setup.runFreeze,
+          inputPack: setup.inputPack,
+          model: officialModel(),
+          artifactDir,
+        } as never),
+      ).rejects.toThrow(/caller-supplied ReviewModel/);
+      expect(predictionFiles(artifactDir)).toEqual([]);
     });
   });
 });
