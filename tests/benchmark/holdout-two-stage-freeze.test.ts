@@ -6,8 +6,8 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { runProtocolDryRun } from "@/lib/server/benchmark/holdout/dry-run";
-import { runControlledEvaluation } from "@/lib/server/benchmark/holdout/evaluation";
+import { runProtocolDryRun } from "@grc/holdout-protocol";
+import { runControlledEvaluation } from "@grc/holdout-protocol";
 import {
   assertOfficialFreezeUsable,
   createInferenceFreeze,
@@ -16,28 +16,28 @@ import {
   loadPersistedSystemFreeze,
   officialFreezeRuntime,
   persistSystemFreeze,
-} from "@/lib/server/benchmark/holdout/freeze";
-import { readCanonicalWorkspaceGit } from "@/lib/server/benchmark/holdout/git-state";
-import { runOfficialBlindInference } from "@/lib/server/benchmark/holdout/inference";
-import { loadGoldPack } from "@/lib/server/benchmark/holdout/gold-pack";
-import { loadInputPack } from "@/lib/server/benchmark/holdout/input-pack";
-import { HOLDOUT_CUSTODIAN_HOME_ENV } from "@/lib/server/benchmark/holdout/lifecycle";
+} from "@grc/holdout-protocol";
+import { readCanonicalWorkspaceGit } from "@grc/holdout-protocol";
+import { runOfficialBlindInference } from "@grc/holdout-protocol";
+import { loadGoldPack } from "@grc/holdout-protocol";
+import { loadInputPack } from "@grc/holdout-protocol";
+import { HOLDOUT_CUSTODIAN_HOME_ENV } from "@grc/holdout-protocol";
 import {
   assertOfficialRunFreezeUsable,
   createOfficialRunFreeze,
   loadPersistedRunFreeze,
   runFreezeIdentity,
-} from "@/lib/server/benchmark/holdout/run-freeze";
+} from "@grc/holdout-protocol";
 import {
   canonicalizeProviderEndpoint,
   observeOfficialAccountBoundaryId,
   observeOfficialProviderBoundary,
   providerAccountBoundaryId,
-} from "@/lib/server/benchmark/holdout/provider-identity";
-import { DEFAULT_DEEPSEEK_BASE_URL } from "@/lib/server/config";
-import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
-import { installCanonicalProviderRequestProbe } from "../helpers/canonical-provider-request-probe";
+} from "@grc/holdout-protocol";
+import { DEFAULT_DEEPSEEK_BASE_URL } from "@grc/providers";
+import { canonicalWorkspaceRoot } from "@grc/holdout-protocol";
 import {
+  installCanonicalProviderRequestProbe,
   PROTOCOL_TEST_PROVIDER_KEY,
   applyProtocolProviderEnv,
   setupOfficialTwoStage,
@@ -46,7 +46,7 @@ import {
   withProtocolProviderEnv,
   withProtocolProviderEnvAsync,
   writeExternalLockedInput,
-} from "../helpers/official-holdout-protocol";
+} from "@grc/test-kit";
 
 function tempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -322,7 +322,7 @@ describe("two-stage freeze protocol", () => {
 
   test("official inference source verifies Run Freeze before createReview", () => {
     const source = readFileSync(
-      join(canonicalWorkspaceRoot(), "src/lib/server/benchmark/holdout/inference.ts"),
+      join(canonicalWorkspaceRoot(), "packages/holdout-protocol/src/inference.ts"),
       "utf8",
     );
     expect(source.indexOf("assertOfficialRunFreezeUsable")).toBeGreaterThan(0);

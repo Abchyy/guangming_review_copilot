@@ -8,13 +8,13 @@ import {
   TITLE_MAX_LENGTH,
   createReviewResponseSchema,
   type ReviewCandidate,
-} from "@/lib/contracts/review";
+} from "@grc/contracts";
 import { createReviewPostHandler } from "@/app/api/reviews/route";
 import { createFindingPatchHandler } from "@/app/api/reviews/[reviewId]/findings/[findingId]/route";
-import { openReviewDatabase } from "@/lib/server/db";
-import { FixtureReviewModel } from "@/lib/server/llm/fixture-review-model";
-import type { ReviewModel } from "@/lib/server/llm/review-model";
-import { ReviewStore } from "@/lib/server/review-store";
+import { openReviewDatabase } from "@grc/review-store";
+import { FixtureReviewModel } from "@grc/providers";
+import type { ReviewModel } from "@grc/providers";
+import { ReviewStore } from "@grc/review-store";
 
 const demoArticle = JSON.parse(
   readFileSync(join(process.cwd(), "data/fixtures/demo-article.json"), "utf8"),
@@ -115,16 +115,43 @@ describe("POST /api/reviews", () => {
     expect(payload.findings).toEqual([]);
   });
 
-  test("mocked provider failure returns 502", async () => {
+  test("provider failure on a rule-bearing article degrades to rules_only instead of 502", async () => {
     const store = new ReviewStore(openReviewDatabase(":memory:"));
     const unavailable = createReviewPostHandler(new FailingModel(), store);
     const malformed = createReviewPostHandler(new MalformedModel(), store);
+    const unavailableResponse = await unavailable(
+      jsonRequest("http://localhost/api/reviews", demoArticle),
+    );
+    expect(unavailableResponse.status).toBe(200);
+    const unavailablePayload = createReviewResponseSchema.parse(await unavailableResponse.json());
+    expect(unavailablePayload.pipeline.fallback?.used).toBe(true);
+    expect(unavailablePayload.pipeline.fallback?.mode).toBe("rules_only");
+    expect(unavailablePayload.findings.length).toBeGreaterThan(0);
     expect(
-      (await unavailable(jsonRequest("http://localhost/api/reviews", demoArticle))).status,
-    ).toBe(502);
-    expect(
-      (await malformed(jsonRequest("http://localhost/api/reviews", demoArticle))).status,
-    ).toBe(502);
+      unavailablePayload.findings.every((item) =>
+        item.evidence.every((ev) => ev.kind !== "ai_judgment"),
+      ),
+    ).toBe(true);
+
+    const malformedResponse = await malformed(
+      jsonRequest("http://localhost/api/reviews", demoArticle),
+    );
+    expect(malformedResponse.status).toBe(200);
+    const malformedPayload = createReviewResponseSchema.parse(await malformedResponse.json());
+    expect(malformedPayload.pipeline.fallback?.used).toBe(true);
+    expect(malformedPayload.pipeline.fallback?.mode).toBe("rules_only");
+  });
+
+  test("provider failure with no rule hits still returns 502", async () => {
+    const store = new ReviewStore(openReviewDatabase(":memory:"));
+    const handler = createReviewPostHandler(new FailingModel(), store);
+    const response = await handler(
+      jsonRequest("http://localhost/api/reviews", {
+        title: "天气很好",
+        body: "今天没有机构、政策名称或可触发规则的错误。",
+      }),
+    );
+    expect(response.status).toBe(502);
   });
 });
 

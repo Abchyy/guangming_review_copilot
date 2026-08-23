@@ -1,0 +1,15 @@
+{
+  "name": "@grc/providers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "openai": "7.4.0",
+    "zod": "4.4.3",
+    "@grc/contracts": "*"
+  }
+}

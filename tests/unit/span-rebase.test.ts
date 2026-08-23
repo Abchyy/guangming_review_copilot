@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import type { CanonicalArticle, Finding, SourceSpan } from "@/lib/contracts/review";
+import type { CanonicalArticle, Finding, SourceSpan } from "@grc/contracts";
 import {
   applyReplacement,
   rebaseFindingsAfterAccept,
-} from "@/lib/server/span-rebase";
+} from "@grc/review-store";
 
 function span(
   field: SourceSpan["field"],

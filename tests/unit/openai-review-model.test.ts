@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { OpenAIReviewModel } from "@/lib/server/llm/openai-review-model";
-import { parseLlmReviewOutput, ReviewProviderError } from "@/lib/contracts/review";
-import { getReviewModelName } from "@/lib/server/config";
-import { snapshotFromProvenance } from "@/lib/server/benchmark/runtime-report";
+import { OpenAIReviewModel } from "@grc/providers";
+import { parseLlmReviewOutput, ReviewProviderError } from "@grc/contracts";
+import { getReviewModelName } from "@grc/providers";
+import { snapshotFromProvenance } from "@grc/benchmark";
 
 const validOutput = {
   candidates: [

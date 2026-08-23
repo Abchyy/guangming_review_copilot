@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { segmentField } from "@/lib/highlight-segments";
-import type { Finding } from "@/lib/contracts/review";
+import type { Finding } from "@grc/contracts";
 
 function spanFinding(
   id: string,

@@ -6,8 +6,8 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { sealedArtifactPath } from "@/lib/server/benchmark/holdout/artifacts";
-import { runProtocolDryRun } from "@/lib/server/benchmark/holdout/dry-run";
+import { sealedArtifactPath } from "@grc/holdout-protocol";
+import { runProtocolDryRun } from "@grc/holdout-protocol";
 import {
   assertOfficialLifecyclePath,
   canonicalOfficialLifecyclePath,
@@ -18,17 +18,17 @@ import {
   protocolFixtureRegistry,
   syntheticLockedRegistry,
   writeCustodianLifecycle,
-} from "@/lib/server/benchmark/holdout/lifecycle";
+} from "@grc/holdout-protocol";
 import {
   assertResultMatchesConsumedLifecycle,
   datasetIdentity,
   runControlledEvaluation,
-} from "@/lib/server/benchmark/holdout/evaluation";
-import type { InferenceFreezeManifest } from "@/lib/server/benchmark/holdout/freeze";
-import { loadGoldPack } from "@/lib/server/benchmark/holdout/gold-pack";
-import { sha256File } from "@/lib/server/benchmark/holdout/identity";
-import { loadInputPack } from "@/lib/server/benchmark/holdout/input-pack";
-import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
+} from "@grc/holdout-protocol";
+import type { InferenceFreezeManifest } from "@grc/holdout-protocol";
+import { loadGoldPack } from "@grc/holdout-protocol";
+import { sha256File } from "@grc/holdout-protocol";
+import { loadInputPack } from "@grc/holdout-protocol";
+import { canonicalWorkspaceRoot } from "@grc/holdout-protocol";
 
 function tempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -260,7 +260,7 @@ describe("holdout consumption and artifact integrity", () => {
     expect(dry.result.gold_pack_id).toBe(goldPack.pack_id);
     expect(dry.result.gold_content_sha256).toBe(goldPack.content_sha256);
     expect(dry.result.evaluator_sha256).toBe(
-      dry.freeze.assets.find((item) => item.path === "src/lib/server/benchmark/evaluate.ts")?.sha256,
+      dry.freeze.assets.find((item) => item.path === "packages/benchmark/src/evaluate.ts")?.sha256,
     );
     expect(dry.result.dataset_sha256).toBe(
       datasetIdentity({

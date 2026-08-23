@@ -5,17 +5,17 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { runOfficialBlindInference } from "@/lib/server/benchmark/holdout/inference";
-import { readCanonicalWorkspaceGit } from "@/lib/server/benchmark/holdout/git-state";
-import { HOLDOUT_CUSTODIAN_HOME_ENV } from "@/lib/server/benchmark/holdout/lifecycle";
+import { runOfficialBlindInference } from "@grc/holdout-protocol";
+import { readCanonicalWorkspaceGit } from "@grc/holdout-protocol";
+import { HOLDOUT_CUSTODIAN_HOME_ENV } from "@grc/holdout-protocol";
 import {
   CANONICAL_PROVIDER_REQUEST_BOUNDARY,
   installCanonicalProviderRequestProbe,
-} from "../helpers/canonical-provider-request-probe";
+} from "@grc/test-kit";
 import {
   applyProtocolProviderEnv,
   setupOfficialTwoStage,
-} from "../helpers/official-holdout-protocol";
+} from "@grc/test-kit";
 
 describe("fresh-process official pre-inference probe", () => {
   test("legal two-stage path reaches the canonical DeepSeek request boundary without a prediction", async () => {

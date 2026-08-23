@@ -1,13 +1,13 @@
 /** @vitest-environment node */
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { DEFAULT_PRODUCTION_MODEL } from "@/lib/server/config";
-import { assertObservedModelMatchesExpected } from "@/lib/server/llm/provenance";
+import { DEFAULT_PRODUCTION_MODEL } from "@grc/providers";
+import { assertObservedModelMatchesExpected } from "@grc/providers";
 import {
   LIVE_SMOKE_INTENT,
   requireEnvApiKey,
   requireExplicitIntent,
-} from "../helpers/live-intent";
+} from "@grc/test-kit";
 
 describe("DeepSeek live smoke (explicit opt-in only)", () => {
   let apiKey: string;
@@ -21,8 +21,8 @@ describe("DeepSeek live smoke (explicit opt-in only)", () => {
   });
 
   test("domestic provider returns schema-valid located findings", async () => {
-    const { DeepSeekReviewModel } = await import("@/lib/server/llm/deepseek-review-model");
-    const { createReview } = await import("@/lib/server/review-service");
+    const { DeepSeekReviewModel } = await import("@grc/providers");
+    const { createReview } = await import("@grc/review-core");
     const model = new DeepSeekReviewModel({ apiKey });
     const result = await createReview(
       {

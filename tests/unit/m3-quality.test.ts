@@ -1,18 +1,18 @@
 import { describe, expect, test } from "vitest";
 
-import type { ReviewCandidate } from "@/lib/contracts/review";
-import { openReviewDatabase } from "@/lib/server/db";
-import { LlmCandidateCache } from "@/lib/server/llm/candidate-cache";
-import { FixtureReviewModel } from "@/lib/server/llm/fixture-review-model";
-import { buildCandidateCacheKey, hashCanonicalArticle } from "@/lib/server/quality/article-hash";
-import { loadBenchmarkDataset } from "@/lib/server/benchmark/dataset";
-import { evaluateReview } from "@/lib/server/benchmark/evaluate";
-import { materializeLlmEvidence } from "@/lib/server/quality/evidence";
-import { fuseFindings } from "@/lib/server/quality/fusion";
-import { retrieveCorpus } from "@/lib/server/quality/retrieval";
-import { runRules } from "@/lib/server/quality/rules";
-import { overrideSeverity } from "@/lib/server/quality/severity";
-import { createReview } from "@/lib/server/review-service";
+import type { ReviewCandidate } from "@grc/contracts";
+import { openReviewDatabase } from "@grc/review-store";
+import { LlmCandidateCache } from "@grc/providers";
+import { FixtureReviewModel } from "@grc/providers";
+import { buildCandidateCacheKey, hashCanonicalArticle } from "@grc/review-core";
+import { loadBenchmarkDataset } from "@grc/benchmark";
+import { evaluateReview } from "@grc/benchmark";
+import { materializeLlmEvidence } from "@grc/review-core";
+import { fuseFindings } from "@grc/review-core";
+import { retrieveCorpus } from "@grc/retrieval";
+import { runRules } from "@grc/rules-engine";
+import { overrideSeverity } from "@grc/review-core";
+import { createReview } from "@grc/review-core";
 
 const article = {
   title: "我市召开基础教育高质量发展座谈会",

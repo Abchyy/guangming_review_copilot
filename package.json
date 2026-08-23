@@ -3,16 +3,25 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
+    "dev": "npm run dev -w @grc/web",
+    "build": "npm run build -w @grc/web",
+    "start": "npm run start -w @grc/web",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:dev-live": "BENCHMARK_DEV_LIVE=1 vitest run --config vitest.live.config.mts tests/live/dev-benchmark.test.ts",
     "test:locked": "BENCHMARK_LOCKED=1 vitest run --config vitest.live.config.mts tests/live/locked-benchmark.test.ts",
     "holdout:dry-run": "vitest run tests/benchmark/holdout-protocol.test.ts",
-    "test:live-smoke": "LIVE_SMOKE=1 vitest run --config vitest.live.config.mts tests/live/deepseek-smoke.test.ts tests/live/openai-smoke.test.ts"
+    "test:live-smoke": "LIVE_SMOKE=1 vitest run --config vitest.live.config.mts tests/live/deepseek-smoke.test.ts tests/live/openai-smoke.test.ts",
+    "test:contracts": "vitest run tests/unit/contract.test.ts tests/unit/workspace-exports.test.ts tests/unit/module-boundaries.test.ts",
+    "test:core": "vitest run tests/unit/review-service.test.ts tests/unit/m3-quality.test.ts tests/unit/fusion-consistency.test.ts tests/unit/fallback.test.ts",
+    "test:rules": "vitest run tests/unit/year-context.test.ts tests/unit/m3-quality.test.ts",
+    "test:retrieval": "vitest run tests/unit/m3-quality.test.ts",
+    "test:providers": "vitest run tests/unit/config.test.ts tests/unit/deepseek-review-model.test.ts tests/unit/openai-review-model.test.ts tests/unit/fallback.test.ts",
+    "test:store": "vitest run tests/unit/review-store.test.ts tests/unit/span-rebase.test.ts",
+    "test:web": "vitest run tests/frontend tests/api tests/unit/highlight-segments.test.ts",
+    "test:benchmark": "vitest run tests/unit/benchmark-evaluate.test.ts tests/benchmark/dataset.test.ts",
+    "test:protocol": "vitest run tests/benchmark/holdout-protocol.test.ts tests/benchmark/holdout-official-provider-binding.test.ts tests/benchmark/holdout-consumption.test.ts tests/unit/test-isolation.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
@@ -37,6 +46,11 @@
     "jsdom": "30.0.1",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
-    "vitest": "4.1.10"
-  }
+    "vitest": "4.1.10",
+    "@grc/test-kit": "*"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

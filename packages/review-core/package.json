@@ -1,0 +1,18 @@
+{
+  "name": "@grc/review-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ranking": "./src/ranking.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "zod": "4.4.3",
+    "@grc/contracts": "*",
+    "@grc/rules-engine": "*",
+    "@grc/retrieval": "*",
+    "@grc/providers": "*"
+  }
+}

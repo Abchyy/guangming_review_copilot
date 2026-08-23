@@ -1,0 +1,15 @@
+{
+  "name": "@grc/test-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@grc/contracts": "*",
+    "@grc/providers": "*",
+    "@grc/holdout-protocol": "*"
+  }
+}

@@ -1,13 +1,13 @@
 /** @vitest-environment node */
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { DEFAULT_OPENAI_BENCHMARK_MODEL } from "@/lib/server/config";
-import { assertObservedModelMatchesExpected } from "@/lib/server/llm/provenance";
+import { DEFAULT_OPENAI_BENCHMARK_MODEL } from "@grc/providers";
+import { assertObservedModelMatchesExpected } from "@grc/providers";
 import {
   LIVE_SMOKE_INTENT,
   requireEnvApiKey,
   requireExplicitIntent,
-} from "../helpers/live-intent";
+} from "@grc/test-kit";
 
 describe("OpenAI live smoke (explicit opt-in, not production)", () => {
   let apiKey: string;
@@ -22,9 +22,9 @@ describe("OpenAI live smoke (explicit opt-in, not production)", () => {
 
   test("live provider returns schema-valid candidates at least once", async () => {
     const { OpenAIReviewModel } = await import(
-      "@/lib/server/llm/openai-review-model"
+      "@grc/providers"
     );
-    const { createReview } = await import("@/lib/server/review-service");
+    const { createReview } = await import("@grc/review-core");
     const model = new OpenAIReviewModel({ apiKey });
     const result = await createReview(
       {

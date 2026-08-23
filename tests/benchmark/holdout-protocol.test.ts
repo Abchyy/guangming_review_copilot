@@ -5,21 +5,21 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { loadBenchmarkDataset, selectDevArticles, selectRegressionArticles } from "@/lib/server/benchmark/dataset";
-import { HoldoutProtocolError } from "@/lib/server/benchmark/holdout/errors";
-import { writeSealedJson } from "@/lib/server/benchmark/holdout/artifacts";
-import { runProtocolDryRun } from "@/lib/server/benchmark/holdout/dry-run";
-import { runControlledEvaluation } from "@/lib/server/benchmark/holdout/evaluation";
+import { loadBenchmarkDataset, selectDevArticles, selectRegressionArticles } from "@grc/benchmark";
+import { HoldoutProtocolError } from "@grc/holdout-protocol";
+import { writeSealedJson } from "@grc/holdout-protocol";
+import { runProtocolDryRun } from "@grc/holdout-protocol";
+import { runControlledEvaluation } from "@grc/holdout-protocol";
 import {
   assertFreezeMatchesWorkspace,
   assertOfficialRuntime,
   createInferenceFreeze,
   freezeIdentity,
   officialFreezeRuntime,
-} from "@/lib/server/benchmark/holdout/freeze";
-import { loadGoldPack } from "@/lib/server/benchmark/holdout/gold-pack";
-import { predictionIdentity } from "@/lib/server/benchmark/holdout/inference";
-import { loadInputPack } from "@/lib/server/benchmark/holdout/input-pack";
+} from "@grc/holdout-protocol";
+import { loadGoldPack } from "@grc/holdout-protocol";
+import { predictionIdentity } from "@grc/holdout-protocol";
+import { loadInputPack } from "@grc/holdout-protocol";
 import {
   LEGACY_LOCKED_HOLDOUT_ID,
   assertFreshOfficialHoldout,
@@ -27,7 +27,7 @@ import {
   loadHoldoutRegistry,
   markHoldoutConsumed,
   protocolFixtureRegistry,
-} from "@/lib/server/benchmark/holdout/lifecycle";
+} from "@grc/holdout-protocol";
 
 const repoRoot = process.cwd();
 
@@ -85,7 +85,7 @@ describe("benchmark holdout protocol", () => {
     const drifted = {
       ...freeze,
       assets: freeze.assets.map((item) =>
-        item.path === "src/lib/server/benchmark/evaluate.ts"
+        item.path === "packages/benchmark/src/evaluate.ts"
           ? { ...item, sha256: "0".repeat(64) }
           : item,
       ),
@@ -102,7 +102,7 @@ describe("benchmark holdout protocol", () => {
   });
 
   test("blind inference module does not import gold or the evaluator", () => {
-    const source = readFileSync(join(repoRoot, "src/lib/server/benchmark/holdout/inference.ts"), "utf8");
+    const source = readFileSync(join(repoRoot, "packages/holdout-protocol/src/inference.ts"), "utf8");
     expect(source).not.toMatch(/gold-pack/);
     expect(source).not.toMatch(/evaluateReview/);
     expect(source).not.toMatch(/loadBenchmarkDataset/);

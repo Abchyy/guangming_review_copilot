@@ -1,17 +1,17 @@
 import { describe, expect, test } from "vitest";
 
-import { FixtureReviewModel } from "@/lib/server/llm/fixture-review-model";
-import { estimateDeepSeekCost } from "@/lib/server/llm/deepseek-pricing";
+import { FixtureReviewModel } from "@grc/providers";
+import { estimateDeepSeekCost } from "@grc/providers";
 import {
   OFFICIAL_BENCHMARK_MODEL,
   aggregateAttemptUsage,
   assertOfficialBenchmarkProvenance,
   buildHttpProvenance,
   extractObservedUsage,
-} from "@/lib/server/llm/provenance";
-import { aggregateCallSnapshots, snapshotFromProvenance as snapshotRuntime } from "@/lib/server/benchmark/runtime-report";
-import { createReview } from "@/lib/server/review-service";
-import type { ObservedUsage, ProviderAttempt } from "@/lib/contracts/review";
+} from "@grc/providers";
+import { aggregateCallSnapshots, snapshotFromProvenance as snapshotRuntime } from "@grc/benchmark";
+import { createReview } from "@grc/review-core";
+import type { ObservedUsage, ProviderAttempt } from "@grc/contracts";
 
 const reportedUsage = (overrides: Partial<ObservedUsage> = {}): ObservedUsage => ({
   input_tokens: 10,

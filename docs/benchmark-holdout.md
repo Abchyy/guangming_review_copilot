@@ -17,7 +17,10 @@
 
 ## 何时可以创建 System Freeze 与 Run Freeze
 
-正式路径的 workspace identity 在 runtime 建立时冻结一次：从已加载源码定位仓库根目录并做 realpath 规范化。之后 `process.chdir()` 不能改变 Git observation、freeze 资产哈希、in-repo 判定，以及 rules / corpus 等 inference 资产的加载根。`createInferenceFreeze`、`runOfficialBlindInference` 和正式 controlled evaluation 若发现当前 cwd 已偏离该 canonical workspace，会 fail-closed，而不会跟随新的 cwd。调用方也不能传入 `repoRoot` / `git` 把检查切到另一个 checkout，或替换 Git observation provider。
+正式路径的 workspace identity 在 runtime 建立时冻结一次：从已加载源码定位仓库根目录并做 realpath 规范化。之后 `process.chdir()` 不能改变 Git observation、freeze 资产哈希、in-repo 判定，以及 rules / corpus 等 inference 资产的加载根。
+
+**目录迁移说明：** 重构后 freeze 资产路径指向 `packages/**`（例如 `packages/providers/src/prompt.ts`、`packages/rules-engine/src/rules.ts`、`packages/benchmark/src/evaluate.ts`），不再使用 `src/lib/server/**`。在旧路径下生成的 System Freeze / Run Freeze artifact **不自动兼容** 新结构，也不得改写旧 artifact 来“适配”。需要新的 official 评测时，必须在新目录上重新 freeze。
+
 
 `createOfficialSystemFreeze({ artifactDir })` 会在任何 inference 之前持久化 **System Freeze**。它冻结被评估系统本身，且不依赖尚未存在的 `holdout_id` / `article_ids`：
 
@@ -49,7 +52,7 @@ fresh hidden holdout 由 custodian 在 `HOLDOUT_CUSTODIAN_HOME` 下创建之后�
 3. **Run Freeze**：绑定 System Freeze、holdout、lifecycle 与 custodian，并在任何模型调用之前持久化。
 4. **Blind Inference**：`runBlindInference` 只读 freeze + input，写出 sealed prediction 与 provenance。该模块不得加载 gold / evaluator。
    对 repo 外的 input-only `locked` pack，`runOfficialBlindInference` 是正式可执行路径：消费前必须存在已验证的 System Freeze 与 Run Freeze，**不得**接受 caller-supplied ReviewModel / client / baseURL / apiKey。正式路径自行构造 canonical DeepSeek adapter，使其 HTTP client 绑定冻结的 endpoint 与 account boundary，并用 Repair 3 的 runtime provenance gate fail-closed。
-5. **Sealed Prediction**：已有 artifact 不得覆盖。正式 prediction 仅在实际 provider-response provenance 满足官方基准时才能落盘。
+5. **Sealed Prediction**：已有 artifact 不得覆盖。正式 prediction 仅在至少一次 provider attempt 成功、provider-response provenance 满足官方基准且 pipeline 未发生 `rules_only` fallback 时才能落盘。
 6. **Independent Evaluation**：`runControlledEvaluation` 读取 sealed prediction + hidden gold + 冻结 evaluator，写出 result manifest。正式路径必须从磁盘上的 sealed prediction 文件加载并重算 identity / 文件哈希，不能用调用方内存对象作为 fallback。
 7. **Result Freeze**：manifest 记录 freeze / run freeze / prediction / input / gold / evaluator / 指标。
 8. **Consumed**：评测后 holdout 变为 `consumed`，不得再当作新版本系统的独立 locked 泛化证据。
@@ -67,3 +70,7 @@ fresh hidden holdout 由 custodian 在 `HOLDOUT_CUSTODIAN_HOME` 下创建之后�
 - 正式 evaluation 必须从 sealed prediction **文件**加载并重算 identity / 文件哈希，不能用内存对象作为 official fallback。
 - 正式 result 的 `holdout_lifecycle_sha256` 是稳定 holdout 身份（不含 status / result_id），可与最终 persisted consumed record 及 `result_id` 交叉复核。
 - 本地 `npm run holdout:dry-run` 只证明协议可执行，其分数不是正式 locked score。
+
+## 目录迁移与旧 freeze
+
+重构后 freeze 资产路径指向 `packages/**`（例如 `packages/providers/src/prompt.ts`、`packages/rules-engine/src/rules.ts`）。在旧 `src/lib/server/**` 路径下生成的 System Freeze / Run Freeze artifact **不自动兼容** 新结构，也不得改写旧 artifact。需要新的 official 评测时，必须在新目录上重新 freeze。

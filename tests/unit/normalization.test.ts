@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { canonicalize } from "@/lib/server/normalization";
+import { canonicalize } from "@grc/review-core";
 
 describe("canonicalization", () => {
   test("converts CRLF and CR to LF only", () => {

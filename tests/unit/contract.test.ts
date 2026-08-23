@@ -4,8 +4,10 @@ import {
   llmReviewOutputSchema,
   parseLlmReviewOutput,
   ReviewProviderError,
+  specialistResultSchema,
+  specialistTaskSchema,
   sourceCandidateSchema,
-} from "@/lib/contracts/review";
+} from "@grc/contracts";
 
 const validCandidate = {
   type: "person",
@@ -113,5 +115,70 @@ describe("LLM candidate contract", () => {
       ],
     });
     expect(parsed.candidates[0]?.suggestion.replacement).toBe("");
+  });
+});
+
+describe("MA-0 specialist contracts", () => {
+  const article = {
+    title: "测试标题",
+    body: "正文含有政策名称。",
+    version: 1,
+  };
+  const sourceSpan = {
+    field: "body" as const,
+    start_offset: 4,
+    end_offset: 8,
+    quoted_text: "政策名称",
+    paragraph_index: 0,
+    article_version: 1,
+  };
+
+  test("accepts the planned task envelope", () => {
+    const parsed = specialistTaskSchema.parse({
+      taskId: "task-001",
+      specialist: "policy",
+      article,
+      candidateSpans: [sourceSpan],
+      retrievedEvidence: [
+        {
+          source_id: "source-001",
+          source_name: "权威来源",
+          source_url: "https://example.invalid/source",
+          authority_level: "official",
+          published_at: "2026-01-01",
+          valid_from: "2026-01-01",
+          valid_to: null,
+          excerpt: "政策名称应使用规范全称。",
+          match_rank: 402,
+          trigger: "政策名称",
+        },
+      ],
+      constraints: {
+        maxCandidates: 5,
+        deadlineMs: 2_000,
+        allowExternalRetrieval: false,
+      },
+    });
+    expect(parsed.specialist).toBe("policy");
+    expect(parsed.constraints.allowExternalRetrieval).toBe(false);
+  });
+
+  test("accepts candidates, provenance, and warnings in the result envelope", () => {
+    const parsed = specialistResultSchema.parse({
+      taskId: "task-001",
+      candidates: [validCandidate],
+      provenance: {
+        taskId: "task-001",
+        specialist: "policy",
+        invoked: true,
+        status: "succeeded",
+        provider: "deepseek",
+        model: "deepseek-chat",
+        elapsedMs: 120,
+      },
+      warnings: [],
+    });
+    expect(parsed.candidates).toHaveLength(1);
+    expect(parsed.provenance.status).toBe("succeeded");
   });
 });

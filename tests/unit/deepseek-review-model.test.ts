@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
-import { parseLlmReviewOutput, ReviewProviderError } from "@/lib/contracts/review";
+import { DeepSeekReviewModel } from "@grc/providers";
+import { parseLlmReviewOutput, ReviewProviderError } from "@grc/contracts";
 
 const validOutput = {
   candidates: [

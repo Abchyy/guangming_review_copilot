@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { describe, expect, test, beforeEach } from "vitest";
 
-import { runControlledEvaluation } from "@/lib/server/benchmark/holdout/evaluation";
+import { runControlledEvaluation } from "@grc/holdout-protocol";
 import {
   FREEZE_SCHEMA_VERSION,
   assertOfficialFreezeAssetInventory,
@@ -17,30 +17,30 @@ import {
   hashFreezeAssets,
   officialFreezeRuntime,
   type InferenceFreezeManifest,
-} from "@/lib/server/benchmark/holdout/freeze";
-import { observeOfficialProviderBoundary } from "@/lib/server/benchmark/holdout/provider-identity";
-import { applyProtocolProviderEnv, setupOfficialTwoStage, withCustodianHomeAsync } from "../helpers/official-holdout-protocol";
+} from "@grc/holdout-protocol";
+import { observeOfficialProviderBoundary } from "@grc/holdout-protocol";
+import { applyProtocolProviderEnv, setupOfficialTwoStage, withCustodianHomeAsync } from "@grc/test-kit";
 import {
   canonicalWorkspaceRoot,
   readCanonicalWorkspaceGit,
   rejectCallerWorkspaceOverride,
-} from "@/lib/server/benchmark/holdout/git-state";
+} from "@grc/holdout-protocol";
 import {
   assertOfficialInferenceProvenance,
   runOfficialBlindInference,
-} from "@/lib/server/benchmark/holdout/inference";
-import { loadInputPack } from "@/lib/server/benchmark/holdout/input-pack";
-import { loadGoldPack } from "@/lib/server/benchmark/holdout/gold-pack";
-import { protocolFixtureRegistry } from "@/lib/server/benchmark/holdout/lifecycle";
-import { OUTPUT_SCHEMA_VERSION, PROMPT_VERSION } from "@/lib/server/llm/prompt";
-import { getCorpusVersion } from "@/lib/server/quality/corpus";
-import { getRuleVersion } from "@/lib/server/quality/rules";
-import { OFFICIAL_BENCHMARK_MODEL } from "@/lib/server/llm/provenance";
+} from "@grc/holdout-protocol";
+import { loadInputPack } from "@grc/holdout-protocol";
+import { loadGoldPack } from "@grc/holdout-protocol";
+import { protocolFixtureRegistry } from "@grc/holdout-protocol";
+import { OUTPUT_SCHEMA_VERSION, PROMPT_VERSION } from "@grc/providers";
+import { getCorpusVersion } from "@grc/retrieval";
+import { getRuleVersion } from "@grc/rules-engine";
+import { OFFICIAL_BENCHMARK_MODEL } from "@grc/providers";
 import {
   ScriptedReviewModel,
   officialAttempt,
   officialSuccessProvenance,
-} from "../helpers/scripted-review-model";
+} from "@grc/test-kit";
 
 const workspace = canonicalWorkspaceRoot();
 
@@ -141,10 +141,10 @@ const fakeCleanGit = {
 
 describe("official workspace trust boundary", () => {
   test("Git observation is a non-overridable function bound to an immutable realpath workspace", () => {
-    const source = readFileSync(join(workspace, "src/lib/server/benchmark/holdout/git-state.ts"), "utf8");
-    const identitySource = readFileSync(join(workspace, "src/lib/server/workspace-identity.ts"), "utf8");
-    const rulesSource = readFileSync(join(workspace, "src/lib/server/quality/rules.ts"), "utf8");
-    const corpusSource = readFileSync(join(workspace, "src/lib/server/quality/corpus.ts"), "utf8");
+    const source = readFileSync(join(workspace, "packages/holdout-protocol/src/git-state.ts"), "utf8");
+    const identitySource = readFileSync(join(workspace, "packages/holdout-protocol/src/workspace-identity.ts"), "utf8");
+    const rulesSource = readFileSync(join(workspace, "packages/rules-engine/src/rules.ts"), "utf8");
+    const corpusSource = readFileSync(join(workspace, "packages/retrieval/src/corpus.ts"), "utf8");
     expect(source).not.toMatch(/export const workspaceGit/);
     expect(source).not.toMatch(/export let /);
     expect(source).not.toMatch(/return process\.cwd\(\)/);
@@ -302,7 +302,7 @@ describe("official workspace trust boundary", () => {
 
     const driftedAsset = synthesizeOfficialFreezeDocument({
       assets: hashFreezeAssets().map((item) =>
-        item.path === "src/lib/server/benchmark/evaluate.ts" ? { ...item, sha256: "0".repeat(64) } : item,
+        item.path === "packages/benchmark/src/evaluate.ts" ? { ...item, sha256: "0".repeat(64) } : item,
       ),
     });
     expect(() => assertOfficialFreezeUsable(driftedAsset)).toThrow(/dirty|drifted/);
@@ -314,7 +314,7 @@ describe("official blind inference", () => {
     const inputPack = writeExternalLockedInput();
     expect(inputPack.in_development_repo).toBe(false);
     expect(inputPack.role).toBe("locked");
-    const inferenceSource = readFileSync(join(workspace, "src/lib/server/benchmark/holdout/inference.ts"), "utf8");
+    const inferenceSource = readFileSync(join(workspace, "packages/holdout-protocol/src/inference.ts"), "utf8");
     expect(inferenceSource).not.toMatch(/gold-pack|loadGoldPack|evaluateReview|loadBenchmarkDataset/);
   });
 
@@ -340,7 +340,7 @@ describe("official blind inference", () => {
     const freeze = synthesizeOfficialFreezeDocument();
     const missing = reseal({
       ...freeze,
-      assets: freeze.assets.filter((item) => item.path !== "src/lib/server/benchmark/evaluate.ts"),
+      assets: freeze.assets.filter((item) => item.path !== "packages/benchmark/src/evaluate.ts"),
     });
     expect(() => assertOfficialFreezeAssetInventory(missing.assets)).toThrow(
       /missing or has extra inference assets/,
@@ -368,7 +368,7 @@ describe("official blind inference", () => {
     const freeze = synthesizeOfficialFreezeDocument();
     const dirty = reseal({
       ...freeze,
-      git: { ...freeze.git, dirty: true, porcelain: " M src/lib/server/llm/prompt.ts" },
+      git: { ...freeze.git, dirty: true, porcelain: " M packages/providers/src/prompt.ts" },
     });
     expect(() => assertOfficialFreezeUsable(dirty)).toThrow(/dirty/);
 
@@ -386,14 +386,14 @@ describe("official blind inference", () => {
     const drifted = reseal({
       ...freeze,
       assets: freeze.assets.map((item) =>
-        item.path === "src/lib/server/benchmark/evaluate.ts" ? { ...item, sha256: "0".repeat(64) } : item,
+        item.path === "packages/benchmark/src/evaluate.ts" ? { ...item, sha256: "0".repeat(64) } : item,
       ),
     });
     expect(() => assertOfficialFreezeUsable(drifted)).toThrow(/dirty|drifted/);
   });
 
   test("Repair 3 provenance gate remains on the official inference path", async () => {
-    const inferenceSource = readFileSync(join(workspace, "src/lib/server/benchmark/holdout/inference.ts"), "utf8");
+    const inferenceSource = readFileSync(join(workspace, "packages/holdout-protocol/src/inference.ts"), "utf8");
     expect(inferenceSource).toMatch(/assertOfficialInferenceProvenance/);
     expect(() =>
       assertOfficialInferenceProvenance(
@@ -433,6 +433,21 @@ describe("official blind inference", () => {
         ]),
       ),
     ).toThrow(/no provider response was available to verify the model/);
+    expect(() =>
+      assertOfficialInferenceProvenance(
+        officialSuccessProvenance([
+          officialAttempt({
+            outcome: "retryable_failure",
+            error: "invalid json",
+          }),
+        ]),
+      ),
+    ).toThrow(/no provider attempt completed successfully/);
+    expect(() =>
+      assertOfficialInferenceProvenance(officialSuccessProvenance(), {
+        used: true,
+      }),
+    ).toThrow(/cannot seal a degraded fallback result/);
 
     const live = readCanonicalWorkspaceGit();
     const freeze = synthesizeOfficialFreezeDocument();

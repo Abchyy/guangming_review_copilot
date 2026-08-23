@@ -4,7 +4,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { DesktopReviewLayout } from "@/components/review/DesktopReviewLayout";
-import type { CreateReviewResponse, Finding } from "@/lib/contracts/review";
+import type { CreateReviewResponse, Finding } from "@grc/contracts";
 
 const articleBody = "第一段有错别字座谈谈会。\n\n第二段写王强在总结时强调。";
 
@@ -106,6 +106,7 @@ describe("desktop vertical slice mapping", () => {
     expect(mark).toBeTruthy();
     await user.click(mark!);
     expect(screen.getByTestId("finding-finding-001").className).toContain("is-selected");
+    expect(screen.getByTestId("desktop-review").className).toContain("is-sheet-open");
   });
 
   test("clicking a finding scrolls to and emphasizes the source span", async () => {
@@ -250,5 +251,80 @@ describe("desktop review workflow", () => {
       json: async () => review,
     });
     await click;
+  });
+});
+
+describe("P0 reading mode, filters, evidence, fallback, and mobile sheet", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+  });
+
+  test("reading mode hides source marks", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    expect(screen.getAllByTestId("source-mark").length).toBeGreaterThan(0);
+    await user.click(screen.getByTestId("reading-mode-toggle"));
+    expect(screen.queryAllByTestId("source-mark")).toHaveLength(0);
+    expect(screen.getByTestId("article-body").textContent).toContain("座谈谈会");
+  });
+
+  test("risk and type filters hide unmatched findings but keep the list chrome", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.selectOptions(screen.getByTestId("severity-filter"), "critical");
+    expect(screen.queryByTestId("finding-finding-001")).toBeNull();
+    expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
+    await user.selectOptions(screen.getByTestId("type-filter"), "basic_text");
+    expect(screen.getByTestId("finding-filter-empty")).toBeTruthy();
+    expect(screen.getByTestId("severity-filter")).toBeTruthy();
+  });
+
+  test("retrieved evidence renders name, url, and excerpt", () => {
+    const withSource = {
+      ...review,
+      findings: [
+        finding("finding-001", "座谈谈会", {
+          evidence: [
+            {
+              kind: "retrieved_source",
+              excerpt: "教育部公开说明",
+              citation_validated: true,
+              source_id: "src.edu",
+              source_name: "教育部",
+              source_url: "https://www.moe.gov.cn/example",
+              source_version_date: "2024-05-01",
+              authority_level: "official",
+            },
+          ],
+        }),
+      ],
+    };
+    render(<Harness initial={withSource} />);
+    const card = screen.getByTestId("finding-finding-001");
+    expect(card.textContent).toContain("教育部");
+    expect(card.textContent).toContain("官方来源");
+    expect(card.textContent).toContain("教育部公开说明");
+    expect(card.textContent).toContain("2024-05-01");
+    expect(card.querySelector("a")?.getAttribute("href")).toBe(
+      "https://www.moe.gov.cn/example",
+    );
+  });
+
+  test("fallback banner is shown when the pipeline degraded", () => {
+    render(
+      <Harness
+        initial={{
+          ...review,
+          pipeline: {
+            ...review.pipeline,
+            fallback: { used: true, mode: "rules_only", reason: "upstream unavailable" },
+            specialists_enabled: false,
+          },
+        }}
+      />,
+    );
+    expect(screen.getByTestId("fallback-banner").textContent).toContain("规则结果");
+    expect(screen.getByTestId("findings-sheet")).toBeTruthy();
+    expect(screen.getByTestId("findings-sheet-toggle")).toBeTruthy();
   });
 });

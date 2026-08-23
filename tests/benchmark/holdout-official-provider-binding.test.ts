@@ -4,24 +4,24 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { readCanonicalWorkspaceGit } from "@/lib/server/benchmark/holdout/git-state";
-import { runOfficialBlindInference } from "@/lib/server/benchmark/holdout/inference";
-import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
-import { DEFAULT_DEEPSEEK_BASE_URL } from "@/lib/server/config";
-import { canonicalWorkspaceRoot } from "@/lib/server/workspace-identity";
-import { OFFICIAL_BENCHMARK_MODEL } from "@/lib/server/llm/provenance";
+import { readCanonicalWorkspaceGit } from "@grc/holdout-protocol";
+import { runOfficialBlindInference } from "@grc/holdout-protocol";
+import { DeepSeekReviewModel } from "@grc/providers";
+import { DEFAULT_DEEPSEEK_BASE_URL } from "@grc/providers";
+import { canonicalWorkspaceRoot } from "@grc/holdout-protocol";
+import { OFFICIAL_BENCHMARK_MODEL } from "@grc/providers";
 import {
   CANONICAL_PROVIDER_REQUEST_BOUNDARY,
   installCanonicalProviderRequestProbe,
-} from "../helpers/canonical-provider-request-probe";
+} from "@grc/test-kit";
 import {
   PROTOCOL_TEST_PROVIDER_KEY,
   applyProtocolProviderEnv,
   setupOfficialTwoStage,
   withCustodianHomeAsync,
   withProtocolProviderEnvAsync,
-} from "../helpers/official-holdout-protocol";
-import { ScriptedReviewModel, officialSuccessProvenance } from "../helpers/scripted-review-model";
+} from "@grc/test-kit";
+import { ScriptedReviewModel, officialSuccessProvenance } from "@grc/test-kit";
 
 function predictionFiles(dir: string): string[] {
   return readdirSync(dir).filter((name) => name.startsWith("prediction-"));
@@ -155,7 +155,7 @@ describe("official provider execution binding", () => {
 
   test("official inference constructs a canonical DeepSeek adapter after freeze guards and rejects caller models", () => {
     const source = readFileSync(
-      join(canonicalWorkspaceRoot(), "src/lib/server/benchmark/holdout/inference.ts"),
+      join(canonicalWorkspaceRoot(), "packages/holdout-protocol/src/inference.ts"),
       "utf8",
     );
     expect(source).toMatch(/rejectCallerOfficialProviderInjection/);

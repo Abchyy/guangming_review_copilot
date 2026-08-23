@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { loadBenchmarkDataset, selectDevArticles, selectRegressionArticles } from "@/lib/server/benchmark/dataset";
+import { loadBenchmarkDataset, selectDevArticles, selectRegressionArticles } from "@grc/benchmark";
 
 describe("benchmark dataset freeze", () => {
   test("dataset file remains 6 dev / 12 regression and has no official locked split", () => {

@@ -4,7 +4,7 @@ import {
   DEFAULT_PRODUCTION_MODEL,
   getReviewModelName,
   getReviewProvider,
-} from "@/lib/server/config";
+} from "@grc/providers";
 
 describe("review provider configuration", () => {
   test("defaults to fixture and does not require OpenAI", () => {

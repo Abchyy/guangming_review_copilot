@@ -1,0 +1,19 @@
+{
+  "name": "@grc/holdout-protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "zod": "4.4.3",
+    "@grc/contracts": "*",
+    "@grc/providers": "*",
+    "@grc/retrieval": "*",
+    "@grc/rules-engine": "*",
+    "@grc/review-core": "*",
+    "@grc/benchmark": "*"
+  }
+}

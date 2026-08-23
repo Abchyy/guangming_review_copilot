@@ -52,3 +52,56 @@ npm run holdout:dry-run
 `npm run test:live-smoke` 同样是显式 opt-in 的诊断入口，不属于平时本地测试，也不冒充 locked 结果。
 
 数据集角色、inference freeze、blind inference 与 hidden gold 评测分离，见 `docs/benchmark-holdout.md`。
+
+## 仓库结构
+
+当前是 **npm workspaces 单体仓库**，唯一可部署应用是 `apps/web`（Next.js 16.3.1 App Router）。业务能力在 `packages/*`，通过公共入口导入，例如：
+
+```ts
+import type { Finding } from "@grc/contracts";
+import { createReview } from "@grc/review-core";
+```
+
+禁止 `import ... from "@grc/*/src/..."`。
+
+| 包 | 职责 | 禁止依赖 |
+| --- | --- | --- |
+| `@grc/contracts` | 请求/响应/Finding/Evidence/Specialist 契约 | 任何业务包 |
+| `@grc/review-core` | 规范化、融合、排序、pipeline | Next、React、SQLite、benchmark |
+| `@grc/rules-engine` | 规则目录与确定性规则 | Next、review-core、holdout |
+| `@grc/retrieval` | Retriever / 语料检索 | Next、review-core、向量库 |
+| `@grc/providers` | Fixture / DeepSeek / OpenAI adapter | 业务规则、DB 写入、holdout |
+| `@grc/review-store` | 状态机 + SQLite adapter | Next、review-core、benchmark |
+| `@grc/benchmark` | 开发集评估器 | 不得反向写入 prompt/rules/corpus |
+| `@grc/holdout-protocol` | official freeze / fail-closed 协议 | 产品运行时不得依赖 |
+| `@grc/test-kit` | 离线测试辅助 | 仅 devDependency |
+| `@grc/web` | UI 与 Route Handler 组合 | benchmark / holdout / test-kit |
+
+`data/` 与 `docs/` 留在仓库根目录。
+
+## 单模块测试
+
+```bash
+npm run test:contracts
+npm run test:core
+npm run test:rules
+npm run test:retrieval
+npm run test:providers
+npm run test:store
+npm run test:web
+npm run test:benchmark
+npm run test:protocol
+```
+
+根目录 `npm test` 仍覆盖全部离线测试。普通测试必须离线，即使环境里有 API Key。
+
+## 如何扩展
+
+- **新增 rule**：在 `data/rules/catalog.json` 增加条目，于 `packages/rules-engine` 实现匹配逻辑，补 `npm run test:rules`。
+- **新增 retriever**：实现 `Retriever`（`retrieve(query: RetrievalQuery): RetrievedEvidence[]`），在 pipeline 中显式注入；不要在 retrieval 包里直接产出最终 Finding。
+- **新增 provider**：实现 `ReviewModel`，只负责模型 I/O 与 provenance，不写规则/排序/数据库。
+- **新增 specialist（默认不启用）**：只实现 `Specialist` / `SpecialistTask` / `SpecialistResult` 契约。`pipeline.specialists_enabled` 必须保持 `false`，产品运行时不得调用 specialist。
+
+## 哪些改动会使 benchmark freeze 失效
+
+System Freeze 绑定 `packages/**` 与 `data/rules`、`data/corpus`、`package-lock.json` 的内容哈希。移动这些路径、修改 prompt/rules/corpus/fusion/evaluator、或改 provider 绑定，都会让**旧 System Freeze artifact 失效**。旧 freeze **不会**自动兼容新目录，也不得篡改旧 artifact。请用新结构重新 freeze。

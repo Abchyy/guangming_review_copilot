@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { runControlledEvaluation } from "@/lib/server/benchmark/holdout/evaluation";
+import { runControlledEvaluation } from "@grc/holdout-protocol";
 import {
   FREEZE_SCHEMA_VERSION,
   createInferenceFreeze,
@@ -13,18 +13,18 @@ import {
   hashFreezeAssets,
   officialFreezeRuntime,
   type InferenceFreezeManifest,
-} from "@/lib/server/benchmark/holdout/freeze";
+} from "@grc/holdout-protocol";
 import {
   canonicalWorkspaceRoot,
   readCanonicalWorkspaceGit,
-} from "@/lib/server/benchmark/holdout/git-state";
-import { runOfficialBlindInference } from "@/lib/server/benchmark/holdout/inference";
-import { loadGoldPack } from "@/lib/server/benchmark/holdout/gold-pack";
-import { loadInputPack } from "@/lib/server/benchmark/holdout/input-pack";
-import { protocolFixtureRegistry } from "@/lib/server/benchmark/holdout/lifecycle";
-import { OUTPUT_SCHEMA_VERSION, PROMPT_VERSION } from "@/lib/server/llm/prompt";
-import { getCorpusVersion } from "@/lib/server/quality/corpus";
-import { getRuleVersion } from "@/lib/server/quality/rules";
+} from "@grc/holdout-protocol";
+import { runOfficialBlindInference } from "@grc/holdout-protocol";
+import { loadGoldPack } from "@grc/holdout-protocol";
+import { loadInputPack } from "@grc/holdout-protocol";
+import { protocolFixtureRegistry } from "@grc/holdout-protocol";
+import { OUTPUT_SCHEMA_VERSION, PROMPT_VERSION } from "@grc/providers";
+import { getCorpusVersion } from "@grc/retrieval";
+import { getRuleVersion } from "@grc/rules-engine";
 
 function reseal(freeze: InferenceFreezeManifest): InferenceFreezeManifest {
   return {

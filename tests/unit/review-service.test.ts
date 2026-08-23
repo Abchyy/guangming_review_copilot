@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { createReview } from "@/lib/server/review-service";
-import { FixtureReviewModel } from "@/lib/server/llm/fixture-review-model";
-import type { ReviewCandidate } from "@/lib/contracts/review";
+import { createReview } from "@grc/review-core";
+import { FixtureReviewModel } from "@grc/providers";
+import type { ReviewCandidate } from "@grc/contracts";
 
 const unlocatable: ReviewCandidate = {
   type: "person",

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 
-import { ReviewDomainError, type ReviewCandidate } from "@/lib/contracts/review";
-import { openReviewDatabase } from "@/lib/server/db";
-import { FixtureReviewModel } from "@/lib/server/llm/fixture-review-model";
-import { createReview, type CreateReviewOptions } from "@/lib/server/review-service";
-import { ReviewStore } from "@/lib/server/review-store";
+import { ReviewDomainError, type ReviewCandidate } from "@grc/contracts";
+import { openReviewDatabase } from "@grc/review-store";
+import { FixtureReviewModel } from "@grc/providers";
+import { createReview, type CreateReviewOptions } from "@grc/review-core";
+import { ReviewStore } from "@grc/review-store";
 
 function memoryStore(): ReviewStore {
   return new ReviewStore(openReviewDatabase(":memory:"));

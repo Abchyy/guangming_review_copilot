@@ -1,15 +1,15 @@
 /** @vitest-environment node */
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { loadBenchmarkDataset } from "@/lib/server/benchmark/dataset";
-import { HoldoutProtocolError } from "@/lib/server/benchmark/holdout/errors";
+import { loadBenchmarkDataset } from "@grc/benchmark";
+import { HoldoutProtocolError } from "@grc/holdout-protocol";
 import {
   LEGACY_LOCKED_HOLDOUT_ID,
   assertFreshOfficialHoldout,
   getHoldoutEntry,
   loadHoldoutRegistry,
-} from "@/lib/server/benchmark/holdout/lifecycle";
-import { LOCKED_INTENT, requireExplicitIntent } from "../helpers/live-intent";
+} from "@grc/holdout-protocol";
+import { LOCKED_INTENT, requireExplicitIntent } from "@grc/test-kit";
 
 /**
  * Official locked evaluation is not available in this development repo.

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,39 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./apps/web/src/*"
+      ],
+      "@grc/contracts": [
+        "./packages/contracts/src/index.ts"
+      ],
+      "@grc/review-core": [
+        "./packages/review-core/src/index.ts"
+      ],
+      "@grc/review-core/ranking": [
+        "./packages/review-core/src/ranking.ts"
+      ],
+      "@grc/rules-engine": [
+        "./packages/rules-engine/src/index.ts"
+      ],
+      "@grc/retrieval": [
+        "./packages/retrieval/src/index.ts"
+      ],
+      "@grc/providers": [
+        "./packages/providers/src/index.ts"
+      ],
+      "@grc/review-store": [
+        "./packages/review-store/src/index.ts"
+      ],
+      "@grc/benchmark": [
+        "./packages/benchmark/src/index.ts"
+      ],
+      "@grc/holdout-protocol": [
+        "./packages/holdout-protocol/src/index.ts"
+      ],
+      "@grc/test-kit": [
+        "./packages/test-kit/src/index.ts"
+      ]
     }
   },
   "include": [
@@ -30,5 +66,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "apps/web/.next",
+    ".next",
+    "src",
+    "src/**/*"
+  ]
 }

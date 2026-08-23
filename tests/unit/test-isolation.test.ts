@@ -13,16 +13,17 @@ import {
   getDeepSeekBaseUrl,
   getReviewModelName,
   getReviewProvider,
-} from "@/lib/server/config";
-import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
-import { OpenAIReviewModel } from "@/lib/server/llm/openai-review-model";
+} from "@grc/providers";
+import { DeepSeekReviewModel } from "@grc/providers";
+import { OpenAIReviewModel } from "@grc/providers";
 
 import {
   DEV_LIVE_INTENT,
   LOCKED_INTENT,
   LIVE_SMOKE_INTENT,
-} from "../helpers/live-intent";
-import { applyOfflineTestEnv, OFFLINE_MODEL_ENV_KEYS } from "../helpers/offline-env";
+  applyOfflineTestEnv,
+  OFFLINE_MODEL_ENV_KEYS,
+} from "@grc/test-kit";
 
 const repoRoot = process.cwd();
 const vitestBin = join(repoRoot, "node_modules", ".bin", "vitest");

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import type { CanonicalArticle, EvidenceItem, Finding, FindingType, Severity } from "@/lib/contracts/review";
+import type { CanonicalArticle, EvidenceItem, Finding, FindingType, Severity } from "@grc/contracts";
 import {
   averageMetrics,
   evaluateReview,
   GoldLocateFailureError,
   type GoldIssue,
-} from "@/lib/server/benchmark/evaluate";
-import { fieldText, findAllExact } from "@/lib/server/span-locator";
+} from "@grc/benchmark";
+import { fieldText, findAllExact } from "@grc/review-core";
 
 const article: CanonicalArticle = {
   title: "标题里也有问题A",

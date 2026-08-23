@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, test } from "vitest";
 
-import { claimHoldoutConsumption } from "@/lib/server/benchmark/holdout/lifecycle";
+import { claimHoldoutConsumption } from "@grc/holdout-protocol";
 
 describe("holdout consume race probe", () => {
   test("claims the configured holdout once", () => {

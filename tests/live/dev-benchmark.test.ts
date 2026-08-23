@@ -4,30 +4,30 @@ import { join } from "node:path";
 
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { loadBenchmarkDataset } from "@/lib/server/benchmark/dataset";
+import { loadBenchmarkDataset } from "@grc/benchmark";
 import {
   averageMetrics,
   evaluateReview,
   type BenchmarkArticle,
   type BenchmarkMetrics,
   type GoldIssue,
-} from "@/lib/server/benchmark/evaluate";
-import type { Finding } from "@/lib/contracts/review";
-import { aggregateCallSnapshots, snapshotFromProvenance } from "@/lib/server/benchmark/runtime-report";
-import { DeepSeekReviewModel } from "@/lib/server/llm/deepseek-review-model";
+} from "@grc/benchmark";
+import type { Finding } from "@grc/contracts";
+import { aggregateCallSnapshots, snapshotFromProvenance } from "@grc/benchmark";
+import { DeepSeekReviewModel } from "@grc/providers";
 import {
   OFFICIAL_BENCHMARK_MODEL,
   assertObservedModelMatchesExpected,
-} from "@/lib/server/llm/provenance";
-import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
-import { getCorpusVersion } from "@/lib/server/quality/corpus";
-import { getRuleVersion } from "@/lib/server/quality/rules";
-import { createReview } from "@/lib/server/review-service";
+} from "@grc/providers";
+import { PROMPT_VERSION } from "@grc/providers";
+import { getCorpusVersion } from "@grc/retrieval";
+import { getRuleVersion } from "@grc/rules-engine";
+import { createReview } from "@grc/review-core";
 import {
   DEV_LIVE_INTENT,
   requireEnvApiKey,
   requireExplicitIntent,
-} from "../helpers/live-intent";
+} from "@grc/test-kit";
 
 /**
  * Diagnostic / development live benchmark.

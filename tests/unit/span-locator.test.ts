@@ -3,13 +3,13 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { parseLlmReviewOutput, type CanonicalArticle } from "@/lib/contracts/review";
-import { canonicalize } from "@/lib/server/normalization";
+import { parseLlmReviewOutput, type CanonicalArticle } from "@grc/contracts";
+import { canonicalize } from "@grc/review-core";
 import {
   findAllExact,
   locateSourceSpan,
   paragraphIndexAt,
-} from "@/lib/server/span-locator";
+} from "@grc/review-core";
 
 function article(title: string, body: string): CanonicalArticle {
   return {
