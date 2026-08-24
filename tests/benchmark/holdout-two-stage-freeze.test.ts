@@ -271,7 +271,7 @@ describe("two-stage freeze protocol", () => {
     const custodianHome = tempDir("holdout-pre-inference-home-");
     const artifactDir = tempDir("holdout-pre-inference-artifacts-");
     const vitestBin = join(workspace, "node_modules", ".bin", "vitest");
-    const result = spawnSync(vitestBin, ["run", "--config", "vitest.pre-inference.config.mts"], {
+    const result = spawnSync(vitestBin, ["run", "--no-color", "--config", "vitest.pre-inference.config.mts"], {
       cwd: workspace,
       encoding: "utf8",
       env: {
@@ -280,11 +280,17 @@ describe("two-stage freeze protocol", () => {
         DEEPSEEK_API_KEY: PROTOCOL_TEST_PROVIDER_KEY,
         DEEPSEEK_BASE_URL: DEFAULT_DEEPSEEK_BASE_URL,
         HOLDOUT_PROBE_ARTIFACT_DIR: artifactDir,
+        NO_COLOR: "1",
+        FORCE_COLOR: "0",
       },
       timeout: 60_000,
     });
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toMatch(/Tests\s+1 passed/);
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.replace(
+      /\u001B\[[0-9;?]*[ -/]*[@-~]/g,
+      "",
+    );
+    expect(result.status, output).toBe(0);
+    expect(output).toMatch(/Tests\s+1 passed/);
     expect(predictionFiles(artifactDir)).toEqual([]);
     expect(existsSync(join(custodianHome, "holdouts", "synthetic-locked-pre-inference", "lifecycle.json"))).toBe(
       true,

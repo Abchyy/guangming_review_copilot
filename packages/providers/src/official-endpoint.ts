@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import { ReviewProviderError } from "@grc/contracts";
 
 import { getDeepSeekApiKey, getDeepSeekBaseUrl } from "./config";
+import { OFFICIAL_BENCHMARK_PROVIDER } from "./provenance";
+
+export const PROVIDER_ACCOUNT_IDENTITY_DOMAIN = "provider-account.v1";
 
 export function canonicalizeProviderEndpoint(raw: string): string {
   const trimmed = raw.trim();
@@ -30,7 +33,7 @@ export function providerAccountBoundaryId(provider: string, credential: string):
     throw new ReviewProviderError("Provider account identity requires a non-empty credential");
   }
   return createHash("sha256")
-    .update(`provider-account.v1:${provider}:${secret}`, "utf8")
+    .update(`${PROVIDER_ACCOUNT_IDENTITY_DOMAIN}:${provider}:${secret}`, "utf8")
     .digest("hex");
 }
 
@@ -47,5 +50,5 @@ export function observeOfficialAccountBoundaryId(): string {
   if (!credential) {
     throw new ReviewProviderError("Official provider account identity requires DEEPSEEK_API_KEY");
   }
-  return providerAccountBoundaryId("deepseek", credential);
+  return providerAccountBoundaryId(OFFICIAL_BENCHMARK_PROVIDER, credential);
 }

@@ -23,6 +23,7 @@ import {
   extractObservedUsage,
   observedString,
   OFFICIAL_BENCHMARK_MODEL,
+  OFFICIAL_BENCHMARK_PROVIDER,
   projectUsage,
 } from "./provenance";
 import {
@@ -124,7 +125,7 @@ export class DeepSeekReviewModel implements ReviewModel {
             provider: "deepseek",
             requested_model: this.model,
             provider_endpoint: baseURL,
-            account_boundary_id: providerAccountBoundaryId("deepseek", apiKey),
+            account_boundary_id: providerAccountBoundaryId(OFFICIAL_BENCHMARK_PROVIDER, apiKey),
           }
         : null;
   }

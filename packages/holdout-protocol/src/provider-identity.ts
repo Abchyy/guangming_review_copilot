@@ -1,66 +1,33 @@
-import { HoldoutProtocolError } from "./errors";
-import { sha256Text } from "./identity";
-import { getDeepSeekApiKey, getDeepSeekBaseUrl } from "@grc/providers";
-import { OFFICIAL_BENCHMARK_PROVIDER } from "@grc/providers";
+import {
+  canonicalizeProviderEndpoint,
+  observeOfficialAccountBoundaryId,
+  observeOfficialProviderEndpoint,
+  providerAccountBoundaryId,
+} from "@grc/providers";
 
-const ACCOUNT_IDENTITY_DOMAIN = "holdout-provider-account.v1";
+import { HoldoutProtocolError, protocolErrorFrom } from "./errors";
+
+export {
+  canonicalizeProviderEndpoint,
+  observeOfficialAccountBoundaryId,
+  observeOfficialProviderEndpoint,
+  providerAccountBoundaryId,
+};
 
 export type OfficialProviderBoundary = {
   provider_endpoint: string;
   account_boundary_id: string;
 };
 
-export function canonicalizeProviderEndpoint(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) {
-    throw new HoldoutProtocolError("Provider endpoint is empty");
-  }
-  let url: URL;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    throw new HoldoutProtocolError("Provider endpoint is not a valid URL");
-  }
-  if (url.username || url.password) {
-    throw new HoldoutProtocolError("Provider endpoint must not embed credentials");
-  }
-  url.hash = "";
-  url.search = "";
-  const path = url.pathname.replace(/\/+$/, "");
-  return `${url.protocol}//${url.host}${path}`;
-}
-
-export function providerAccountBoundaryId(provider: string, credential: string): string {
-  const secret = credential.trim();
-  if (secret.length === 0) {
-    throw new HoldoutProtocolError("Provider account identity requires a non-empty credential");
-  }
-  return sha256Text(`${ACCOUNT_IDENTITY_DOMAIN}:${provider}:${secret}`);
-}
-
-export function observeOfficialProviderEndpoint(): string {
-  const canonical = canonicalizeProviderEndpoint(getDeepSeekBaseUrl());
-  if (!canonical.startsWith("https://")) {
-    throw new HoldoutProtocolError("Official provider endpoint must be https");
-  }
-  return canonical;
-}
-
-export function observeOfficialAccountBoundaryId(): string {
-  const credential = getDeepSeekApiKey();
-  if (!credential) {
-    throw new HoldoutProtocolError(
-      "Official system freeze requires DEEPSEEK_API_KEY to bind provider account identity",
-    );
-  }
-  return providerAccountBoundaryId(OFFICIAL_BENCHMARK_PROVIDER, credential);
-}
-
 export function observeOfficialProviderBoundary(): OfficialProviderBoundary {
-  return {
-    provider_endpoint: observeOfficialProviderEndpoint(),
-    account_boundary_id: observeOfficialAccountBoundaryId(),
-  };
+  try {
+    return {
+      provider_endpoint: observeOfficialProviderEndpoint(),
+      account_boundary_id: observeOfficialAccountBoundaryId(),
+    };
+  } catch (error) {
+    throw protocolErrorFrom(error, "Official provider boundary observation failed");
+  }
 }
 
 export function assertArtifactContainsNoSecrets(value: unknown, secrets: Array<string | undefined>): void {

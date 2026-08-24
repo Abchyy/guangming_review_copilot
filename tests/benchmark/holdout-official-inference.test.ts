@@ -165,16 +165,24 @@ describe("official workspace trust boundary", () => {
     const vitestBin = join(workspace, "node_modules", ".bin", "vitest");
     const result = spawnSync(
       vitestBin,
-      ["run", "--config", "vitest.chdir.config.mts"],
+      ["run", "--no-color", "--config", "vitest.chdir.config.mts"],
       {
         cwd: workspace,
         encoding: "utf8",
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+          FORCE_COLOR: "0",
+        },
         timeout: 60_000,
       },
     );
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toMatch(/Tests\s+1 passed/);
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.replace(
+      /\u001B\[[0-9;?]*[ -/]*[@-~]/g,
+      "",
+    );
+    expect(result.status, output).toBe(0);
+    expect(output).toMatch(/Tests\s+1 passed/);
   });
 
   test("forges a clean Git observation or redirects repoRoot on official create", () => {
