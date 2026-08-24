@@ -12,6 +12,7 @@
     "test:dev-live": "BENCHMARK_DEV_LIVE=1 vitest run --config vitest.live.config.mts tests/live/dev-benchmark.test.ts",
     "test:locked": "BENCHMARK_LOCKED=1 vitest run --config vitest.live.config.mts tests/live/locked-benchmark.test.ts",
     "holdout:dry-run": "vitest run tests/benchmark/holdout-protocol.test.ts",
+    "holdout:status": "node --env-file=.env.holdout.local scripts/holdout-status.mjs",
     "test:live-smoke": "LIVE_SMOKE=1 vitest run --config vitest.live.config.mts tests/live/deepseek-smoke.test.ts tests/live/openai-smoke.test.ts",
     "test:contracts": "vitest run tests/unit/contract.test.ts tests/unit/workspace-exports.test.ts tests/unit/module-boundaries.test.ts",
     "test:core": "vitest run tests/unit/review-service.test.ts tests/unit/m3-quality.test.ts tests/unit/fusion-consistency.test.ts tests/unit/fallback.test.ts",
@@ -21,7 +22,7 @@
     "test:store": "vitest run tests/unit/review-store.test.ts tests/unit/span-rebase.test.ts",
     "test:web": "vitest run tests/frontend tests/api tests/unit/highlight-segments.test.ts",
     "test:benchmark": "vitest run tests/unit/benchmark-evaluate.test.ts tests/benchmark/dataset.test.ts",
-    "test:protocol": "vitest run tests/benchmark/holdout-protocol.test.ts tests/benchmark/holdout-official-provider-binding.test.ts tests/benchmark/holdout-consumption.test.ts tests/unit/test-isolation.test.ts"
+    "test:protocol": "vitest run tests/benchmark/holdout-protocol.test.ts tests/benchmark/holdout-custodian-connection.test.ts tests/benchmark/holdout-official-provider-binding.test.ts tests/benchmark/holdout-consumption.test.ts tests/unit/test-isolation.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",

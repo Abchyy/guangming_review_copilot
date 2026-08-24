@@ -45,6 +45,20 @@ fresh hidden holdout 由 custodian 在 `HOLDOUT_CUSTODIAN_HOME` 下创建之后�
 
 `purpose: "protocol_dry_run"` 允许 dirty 工作树，且不走两阶段官方冻结；其结果不能标记为 official locked。
 
+## 外部 custodian 接入
+
+开发仓库不保存 holdout 根路径。每台执行机器使用被 Git 忽略的 `.env.holdout.local`：
+
+```bash
+cp config/holdout.env.example .env.holdout.local
+# 将 HOLDOUT_CUSTODIAN_HOME 改为仓库外绝对路径
+npm run holdout:status
+```
+
+`holdout:status` 只读取各 holdout 的 `lifecycle.json`，并报告 role、status、是否存在 input/hidden 边界及 official eligibility。它不读取 input 稿件正文，不列举或读取 `hidden/` 中的 gold、adjudication、evidence snapshots，也不修改 lifecycle。
+
+该命令只是连接与状态检查，不创建 System Freeze / Run Freeze，不调用模型，也不执行 evaluation。状态为 `consumed` 的条目会报告为历史资产，不能重新作为 fresh official locked evidence。未来新一轮正式评测必须在同一外部根目录下创建新的唯一 holdout ID，并重新生成与当前 clean commit 绑定的 System Freeze。
+
 ## Blind inference 与 evaluation 如何分离
 
 1. **System Freeze**：冻结被评估系统身份，并在 inference 之前独立持久化。

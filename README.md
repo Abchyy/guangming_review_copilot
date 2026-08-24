@@ -47,11 +47,18 @@ npm run test:locked
 
 # 本地验证 holdout 协议基础设施（非正式分数）
 npm run holdout:dry-run
+
+# 检查仓库外 custodian 连接；只读取 lifecycle 安全元数据
+cp config/holdout.env.example .env.holdout.local
+# 编辑 .env.holdout.local 中的绝对路径后执行
+npm run holdout:status
 ```
 
 `npm run test:live-smoke` 同样是显式 opt-in 的诊断入口，不属于平时本地测试，也不冒充 locked 结果。
 
 数据集角色、inference freeze、blind inference 与 hidden gold 评测分离，见 `docs/benchmark-holdout.md`。
+
+`.env.holdout.local` 只保存在本机并由 Git 忽略。`holdout:status` 不读取 input 正文、gold、adjudication 或 evidence snapshots，也不会改变 lifecycle。状态为 `consumed` 的 holdout 只可作为历史审计或 regression 资产。
 
 ## 仓库结构
 
