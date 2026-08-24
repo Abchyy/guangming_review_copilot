@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import type { Finding, FindingAction, FindingStatus, Severity } from "@grc/contracts";
+import type { EvidenceItem, Finding, FindingAction, FindingStatus, Severity } from "@grc/contracts";
 import { FINDING_TYPES, SEVERITIES } from "@grc/contracts";
 import { sortFindingsForDisplay } from "@/lib/highlight-segments";
+import { IconAlert, IconExternal, IconLocate, IconSealCheck } from "@/components/review/icons";
 
 type FindingListProps = {
   findings: Finding[];
@@ -15,10 +16,10 @@ type FindingListProps = {
 };
 
 const SEVERITY_LABEL: Record<Severity, string> = {
-  critical: "Critical",
-  high: "High",
-  medium: "Medium",
-  low: "Low",
+  critical: "严重",
+  high: "高",
+  medium: "中",
+  low: "低",
 };
 
 const TYPE_LABEL: Record<Finding["type"], string> = {
@@ -39,6 +40,18 @@ const STATUS_LABEL: Record<FindingStatus, string> = {
   ignored: "已忽略",
   verify: "待人工核实",
   invalidated: "已失效",
+};
+
+const EVIDENCE_KIND_LABEL: Record<EvidenceItem["kind"], string> = {
+  rule: "规则",
+  internal_context: "文内对照",
+  retrieved_source: "检索来源",
+  ai_judgment: "模型判断",
+};
+
+const AUTHORITY_LABEL: Record<string, string> = {
+  official: "官方来源",
+  internal: "内部来源",
 };
 
 export function FindingList({
@@ -65,7 +78,9 @@ export function FindingList({
   if (findings.length === 0) {
     return (
       <div data-testid="finding-empty" className="finding-empty">
-        未发现需要提示的问题。
+        <IconSealCheck />
+        <strong>未发现需要提示的问题</strong>
+        稿件已通过本轮自动审校，仍建议人工通读一遍。
       </div>
     );
   }
@@ -73,7 +88,7 @@ export function FindingList({
   return (
     <div className="finding-list" data-testid="finding-list">
       <div className="finding-filters">
-        <label>
+        <label className="filter-field">
           风险
           <select
             data-testid="severity-filter"
@@ -88,7 +103,7 @@ export function FindingList({
             ))}
           </select>
         </label>
-        <label>
+        <label className="filter-field">
           类型
           <select
             data-testid="type-filter"
@@ -103,111 +118,145 @@ export function FindingList({
             ))}
           </select>
         </label>
+        <span className="filter-result">{ordered.length} 条</span>
       </div>
       {ordered.length === 0 ? (
         <div data-testid="finding-filter-empty" className="finding-empty">
-          没有符合筛选条件的问题。
+          <strong>没有符合筛选条件的问题</strong>
+          可调整风险或类型筛选条件。
         </div>
       ) : null}
-      {ordered.map((finding) => {
+      {ordered.map((finding, index) => {
         const selected = finding.finding_id === selectedFindingId;
         const pending = pendingActionFindingId === finding.finding_id;
         const canAct =
           (finding.status === "pending" || finding.status === "verify") && !pendingActionFindingId;
         const canAccept = canAct && finding.suggestion.replacement !== null;
         return (
-          <div
+          <article
             key={finding.finding_id}
             data-testid={`finding-${finding.finding_id}`}
             className={`finding-card ${selected ? "is-selected" : ""} status-${finding.status}`}
-            onClick={() => onSelectFinding(finding.finding_id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onSelectFinding(finding.finding_id);
-              }
-            }}
-            role="button"
-            tabIndex={0}
           >
-            <div className="finding-card-select">
-              <div className="finding-card-meta">
-                <span className={`severity-pill severity-${finding.severity}`}>
-                  {SEVERITY_LABEL[finding.severity]}
-                </span>
-                <span className="finding-type">{TYPE_LABEL[finding.type]}</span>
-                <span className={`status-pill status-${finding.status}`}>
-                  {STATUS_LABEL[finding.status]}
-                </span>
-                <span className="finding-confidence">
-                  {Math.round(finding.confidence * 100)}%
-                </span>
-              </div>
-              <h2 className="finding-title">{finding.title}</h2>
-              <p className="finding-reason">{finding.reason}</p>
-              <p className="finding-suggestion">建议：{finding.suggestion.text}</p>
-              {finding.suggestion.replacement ? (
-                <p className="finding-quote">替换为：{finding.suggestion.replacement}</p>
-              ) : (
-                <p className="finding-unsafe" data-testid={`no-safe-replacement-${finding.finding_id}`}>
-                  建议人工核实，无安全自动替换。
-                </p>
-              )}
-              {finding.evidence.map((item, index) => (
-                <p key={`${finding.finding_id}-ev-${index}`} className="finding-evidence">
-                  依据[{item.kind}]
-                  {item.source_name ? ` ${item.source_name}` : ""}
-                  {item.authority_level
-                    ? ` · ${item.authority_level === "official" ? "官方来源" : "内部来源"}`
-                    : ""}
-                  {item.source_url ? (
-                    <>
-                      {" · "}
-                      <a href={item.source_url} target="_blank" rel="noreferrer">
-                        查看来源
-                      </a>
-                    </>
-                  ) : null}
-                  {item.source_version_date ? ` · ${item.source_version_date}` : ""}
-                  ：{item.excerpt}
-                </p>
-              ))}
-              <p className="finding-quote">原文：{finding.source_span.quoted_text}</p>
+            <div className="finding-card-meta">
+              <span className="finding-index">{String(index + 1).padStart(2, "0")}</span>
+              <span className={`severity-pill severity-${finding.severity}`}>
+                {SEVERITY_LABEL[finding.severity]}
+              </span>
+              <span className="finding-type">{TYPE_LABEL[finding.type]}</span>
+              <span className={`status-pill status-${finding.status}`}>
+                {STATUS_LABEL[finding.status]}
+              </span>
+              <span className="finding-confidence">
+                置信 {Math.round(finding.confidence * 100)}%
+              </span>
             </div>
-            <div
-              className="finding-actions"
-              onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
-            >
+            <h2 className="finding-title">
+              <button
+                type="button"
+                className="finding-locate"
+                data-testid={`locate-${finding.finding_id}`}
+                title="在正文中定位"
+                onClick={() => onSelectFinding(finding.finding_id)}
+              >
+                <IconLocate />
+                <span>{finding.title}</span>
+              </button>
+            </h2>
+            <p className="finding-quote">
+              <span className="quote-label">原文</span>
+              {finding.source_span.quoted_text}
+            </p>
+            <p className="finding-reason">{finding.reason}</p>
+            <p className="finding-suggestion">
+              <span className="finding-label">建议</span>
+              {finding.suggestion.text}
+            </p>
+            {finding.suggestion.replacement !== null ? (
+              <p className="finding-replace">
+                <span className="finding-label">改为</span>
+                <span className="replace-new">{finding.suggestion.replacement}</span>
+              </p>
+            ) : (
+              <p className="finding-unsafe" data-testid={`no-safe-replacement-${finding.finding_id}`}>
+                <IconAlert />
+                无安全自动替换，需人工核实
+              </p>
+            )}
+            {finding.evidence.length > 0 ? (
+              <div className="finding-evidence-list">
+                {finding.evidence.map((item, evidenceIndex) => (
+                  <p
+                    key={`${finding.finding_id}-ev-${evidenceIndex}`}
+                    className="finding-evidence"
+                  >
+                    <span className={`evidence-kind evidence-${item.kind}`}>
+                      {EVIDENCE_KIND_LABEL[item.kind]}
+                    </span>
+                    {item.excerpt}
+                    {item.source_name ||
+                    item.authority_level ||
+                    item.source_version_date ||
+                    item.source_url ? (
+                      <span className="evidence-meta">
+                        {" — "}
+                        {[
+                          item.source_name,
+                          item.authority_level
+                            ? (AUTHORITY_LABEL[item.authority_level] ?? item.authority_level)
+                            : null,
+                          item.source_version_date,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        {item.source_url ? (
+                          <>
+                            {" · "}
+                            <a href={item.source_url} target="_blank" rel="noreferrer">
+                              查看来源
+                              <IconExternal width={11} height={11} />
+                            </a>
+                          </>
+                        ) : null}
+                        {item.kind === "retrieved_source" && item.citation_validated
+                          ? " · 引文已核验"
+                          : ""}
+                      </span>
+                    ) : null}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            <div className="finding-actions">
               <button
                 type="button"
                 data-testid={`accept-${finding.finding_id}`}
-                className="action-button"
+                className="action-button action-accept"
                 disabled={!canAccept}
                 onClick={() => onDecide(finding.finding_id, "accept")}
               >
-                {pending ? "处理中…" : "Accept"}
+                {pending ? "处理中…" : "接受"}
               </button>
               <button
                 type="button"
                 data-testid={`ignore-${finding.finding_id}`}
-                className="action-button"
+                className="action-button action-ignore"
                 disabled={!canAct}
                 onClick={() => onDecide(finding.finding_id, "ignore")}
               >
-                Ignore
+                忽略
               </button>
               <button
                 type="button"
                 data-testid={`verify-${finding.finding_id}`}
-                className="action-button"
+                className="action-button action-verify"
                 disabled={!canAct}
                 onClick={() => onDecide(finding.finding_id, "verify")}
               >
-                Verify
+                待核实
               </button>
             </div>
-          </div>
+          </article>
         );
       })}
     </div>

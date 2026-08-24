@@ -4,6 +4,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { DesktopReviewLayout } from "@/components/review/DesktopReviewLayout";
+import { ReviewApp } from "@/components/review/ReviewApp";
 import type { CreateReviewResponse, Finding } from "@grc/contracts";
 
 const articleBody = "第一段有错别字座谈谈会。\n\n第二段写王强在总结时强调。";
@@ -93,7 +94,7 @@ describe("desktop vertical slice mapping", () => {
     expect(screen.getAllByTestId("source-mark").length).toBeGreaterThan(0);
     expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
     expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
-    expect(screen.getByTestId("finding-finding-002").textContent).toContain("Critical");
+    expect(screen.getByTestId("finding-finding-002").textContent).toContain("严重");
     expect(screen.getByTestId("finding-finding-001").textContent).toContain("测试依据");
   });
 
@@ -109,10 +110,10 @@ describe("desktop vertical slice mapping", () => {
     expect(screen.getByTestId("desktop-review").className).toContain("is-sheet-open");
   });
 
-  test("clicking a finding scrolls to and emphasizes the source span", async () => {
+  test("clicking a finding locate button scrolls to and emphasizes the source span", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(screen.getByTestId("finding-finding-002"));
+    await user.click(screen.getByTestId("locate-finding-002"));
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
     const mark = screen
       .getAllByTestId("source-mark")
@@ -191,6 +192,7 @@ describe("desktop review workflow", () => {
     expect(screen.getByTestId("article-body").textContent).toContain("座谈会");
     expect(screen.getByTestId("finding-finding-001").textContent).toContain("已接受");
     expect(screen.getByTestId("finding-finding-002").className).toContain("is-selected");
+    expect(screen.getByTestId("action-toast").textContent).toContain("已接受");
   });
 
   test("Ignore and Verify show status without mutating article", async () => {
@@ -326,5 +328,42 @@ describe("P0 reading mode, filters, evidence, fallback, and mobile sheet", () =>
     expect(screen.getByTestId("fallback-banner").textContent).toContain("规则结果");
     expect(screen.getByTestId("findings-sheet")).toBeTruthy();
     expect(screen.getByTestId("findings-sheet-toggle")).toBeTruthy();
+  });
+
+  test("sheet toggle expands and collapses the findings sheet", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const shell = screen.getByTestId("desktop-review");
+    expect(shell.className).toContain("is-sheet-collapsed");
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    expect(shell.className).toContain("is-sheet-open");
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    expect(shell.className).toContain("is-sheet-collapsed");
+  });
+});
+
+describe("article input page", () => {
+  test("renders masthead, char count, and submit affordance", () => {
+    render(<ReviewApp />);
+    expect(screen.getByTestId("article-input")).toBeTruthy();
+    expect(screen.getByTestId("body-count").textContent).toMatch(/\d+ 字/);
+    expect(screen.getByTestId("start-review").textContent).toContain("开始审校");
+  });
+
+  test("shows loading state and error banner on failure", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: "审校服务暂不可用" }),
+      }),
+    );
+    render(<ReviewApp />);
+    await user.click(screen.getByTestId("start-review"));
+    expect((await screen.findByTestId("review-error")).textContent).toContain(
+      "审校服务暂不可用",
+    );
+    vi.unstubAllGlobals();
   });
 });
