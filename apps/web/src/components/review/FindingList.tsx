@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EvidenceItem, Finding, FindingAction, FindingStatus, Severity } from "@grc/contracts";
 import { FINDING_TYPES, SEVERITIES } from "@grc/contracts";
@@ -11,6 +11,7 @@ type FindingListProps = {
   findings: Finding[];
   selectedFindingId: string | null;
   pendingActionFindingId: string | null;
+  revealNonce?: number;
   onSelectFinding: (findingId: string) => void;
   onDecide: (findingId: string, action: FindingAction) => void;
 };
@@ -58,9 +59,11 @@ export function FindingList({
   findings,
   selectedFindingId,
   pendingActionFindingId,
+  revealNonce = 0,
   onSelectFinding,
   onDecide,
 }: FindingListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
   const [severityFilter, setSeverityFilter] = useState<Severity | "all">("all");
   const [typeFilter, setTypeFilter] = useState<Finding["type"] | "all">("all");
   const ordered = useMemo(() => {
@@ -75,6 +78,29 @@ export function FindingList({
     });
   }, [findings, severityFilter, typeFilter]);
 
+  useEffect(() => {
+    if (!selectedFindingId) {
+      return;
+    }
+    const root = listRef.current;
+    if (!root) {
+      return;
+    }
+    const target = root.querySelector<HTMLElement>(
+      `[data-testid="finding-${cssEscape(selectedFindingId)}"]`,
+    );
+    if (!target) {
+      return;
+    }
+    const reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({
+      block: "nearest",
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, [selectedFindingId, revealNonce]);
+
   if (findings.length === 0) {
     return (
       <div data-testid="finding-empty" className="finding-empty">
@@ -86,7 +112,7 @@ export function FindingList({
   }
 
   return (
-    <div className="finding-list" data-testid="finding-list">
+    <div ref={listRef} className="finding-list" data-testid="finding-list">
       <div className="finding-filters">
         <label className="filter-field">
           风险
@@ -261,4 +287,11 @@ export function FindingList({
       })}
     </div>
   );
+}
+
+function cssEscape(value: string): string {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  return value.replace(/"/g, '\\"');
 }

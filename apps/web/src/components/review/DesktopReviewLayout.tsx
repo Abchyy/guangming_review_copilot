@@ -10,6 +10,31 @@ import { Masthead } from "@/components/review/Masthead";
 import { IconAlert, IconBook, IconCheck, IconRefresh } from "@/components/review/icons";
 import { selectAfterDecision, unresolvedFindings } from "@/lib/review-selection";
 
+/** Keep in sync with `@media (max-width: 1023px)` in globals.css. */
+export const REVIEW_COMPACT_MEDIA_QUERY = "(max-width: 1023px)";
+
+function blockHiddenSheetEvents(event: { preventDefault: () => void; stopPropagation: () => void }) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function useCompactReviewLayout() {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const media = window.matchMedia(REVIEW_COMPACT_MEDIA_QUERY);
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return compact;
+}
+
 type DesktopReviewLayoutProps = {
   review: CreateReviewResponse;
   onReviewChange: (review: CreateReviewResponse) => void;
@@ -41,7 +66,10 @@ export function DesktopReviewLayout({
   const [actionError, setActionError] = useState<string | null>(null);
   const [readingMode, setReadingMode] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [listRevealNonce, setListRevealNonce] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const compact = useCompactReviewLayout();
+  const sheetContentHidden = compact && !sheetOpen;
 
   useEffect(() => {
     if (!toast) {
@@ -54,6 +82,7 @@ export function DesktopReviewLayout({
   function selectFromArticle(findingId: string) {
     setSelectedFindingId(findingId);
     setSheetOpen(true);
+    setListRevealNonce((value) => value + 1);
   }
 
   function selectFromList(findingId: string) {
@@ -119,6 +148,7 @@ export function DesktopReviewLayout({
     <div
       className={`review-shell${readingMode ? " is-reading" : ""}${sheetOpen ? " is-sheet-open" : " is-sheet-collapsed"}`}
       data-testid="desktop-review"
+      data-compact={compact ? "true" : "false"}
     >
       <header className="review-header">
         <Masthead />
@@ -194,7 +224,8 @@ export function DesktopReviewLayout({
             type="button"
             className="sheet-toggle"
             data-testid="findings-sheet-toggle"
-            aria-expanded={sheetOpen}
+            aria-expanded={compact ? sheetOpen : true}
+            aria-controls="findings-sheet-panel"
             onClick={() => setSheetOpen((value) => !value)}
           >
             <span className="sheet-handle" aria-hidden="true" />
@@ -207,21 +238,33 @@ export function DesktopReviewLayout({
               </span>
             </span>
           </button>
-          <div className="findings-head">
-            <h2 className="findings-title">审校意见</h2>
-            <span className="findings-count">
-              共 {totalCount} 条 · 待处理 {unresolvedCount}
-            </span>
+          <div
+            id="findings-sheet-panel"
+            className="findings-sheet-body"
+            data-testid="findings-sheet-panel"
+            hidden={sheetContentHidden}
+            inert={sheetContentHidden}
+            onClickCapture={sheetContentHidden ? blockHiddenSheetEvents : undefined}
+            onKeyDownCapture={sheetContentHidden ? blockHiddenSheetEvents : undefined}
+            onPointerDownCapture={sheetContentHidden ? blockHiddenSheetEvents : undefined}
+          >
+            <div className="findings-head">
+              <h2 className="findings-title">审校意见</h2>
+              <span className="findings-count">
+                共 {totalCount} 条 · 待处理 {unresolvedCount}
+              </span>
+            </div>
+            <FindingList
+              findings={review.findings}
+              selectedFindingId={selectedFindingId}
+              pendingActionFindingId={pendingActionFindingId}
+              revealNonce={listRevealNonce}
+              onSelectFinding={selectFromList}
+              onDecide={(findingId, action) => {
+                void decide(findingId, action);
+              }}
+            />
           </div>
-          <FindingList
-            findings={review.findings}
-            selectedFindingId={selectedFindingId}
-            pendingActionFindingId={pendingActionFindingId}
-            onSelectFinding={selectFromList}
-            onDecide={(findingId, action) => {
-              void decide(findingId, action);
-            }}
-          />
         </aside>
       </div>
       {toast ? (
