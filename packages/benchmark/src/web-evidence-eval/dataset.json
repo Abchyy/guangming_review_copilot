@@ -1,0 +1,713 @@
+{
+  "protocol_id": "web-evidence-dev-eval",
+  "protocol_version": "0.1.0",
+  "dataset_version": "0.1.0",
+  "role": "development_only",
+  "split": "dev",
+  "official_holdout": false,
+  "may_claim_official_locked_generalization": false,
+  "provenance": {
+    "authoring": "handwritten_synthetic",
+    "contains_unpublished_real_articles": false,
+    "contains_real_pii": false,
+    "contains_holdout_gold": false,
+    "network_required_to_score": false
+  },
+  "query_budget": {
+    "max_queries_per_article": 2,
+    "max_queries_per_claim": 1,
+    "max_results_per_query": 3
+  },
+  "gates": {
+    "query_trigger_accuracy": { "operator": "gte", "threshold": 0.85, "hardness": "soft" },
+    "query_budget_compliance_rate": { "operator": "eq", "threshold": 1, "hardness": "hard" },
+    "authoritative_source_ratio": { "operator": "gte", "threshold": 0.8, "hardness": "soft" },
+    "evidence_traceability_rate": { "operator": "gte", "threshold": 0.9, "hardness": "soft" },
+    "failure_degradation_correctness": { "operator": "eq", "threshold": 1, "hardness": "hard" },
+    "privacy_minimization_compliance_rate": { "operator": "eq", "threshold": 1, "hardness": "hard" }
+  },
+  "enumerations": {
+    "risk_categories": [
+      "person_title",
+      "organization_name",
+      "policy_regulation",
+      "date",
+      "number",
+      "attribution"
+    ],
+    "expected_statuses": ["confirmed", "conflicting", "insufficient", "not_applicable"],
+    "allowed_source_classes": [
+      "official_agency_page",
+      "official_gazette",
+      "statute_or_regulation",
+      "statistical_bulletin",
+      "authorized_news_release",
+      "calendar_authority"
+    ],
+    "forbidden_outbound_fields": [
+      "full_unpublished_body",
+      "reporter_phone",
+      "reporter_email",
+      "private_citizen_address",
+      "private_citizen_id",
+      "unpublished_source_identity",
+      "internal_newsroom_note",
+      "holdout_identifier",
+      "draft_watermark",
+      "interviewee_contact"
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "we-dev-001-person-title-confirm",
+      "article_id": "we-dev-art-person-a",
+      "risk_category": "person_title",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯（记者 周启明）青石市教育局局长陈文博昨日在基础教育工作会议上讲话，强调要把课后服务覆盖到全部义务教育学校。",
+      "claim": {
+        "text": "青石市教育局局长陈文博",
+        "span_quote": "青石市教育局局长陈文博",
+        "normalized_fact": "人物：陈文博；职务：青石市教育局局长；as-of：2026-08-18"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["official_agency_page", "authorized_news_release"],
+      "expected_status": "confirmed",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "reporter_phone", "reporter_email", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_agency_page",
+          "title": "青石市人民政府领导与部门负责人公开信息（合成夹具）",
+          "locator": "fixture://qingshi-gov/leaders/chen-wenbo",
+          "excerpt": "市教育局局长 陈文博",
+          "as_of": "2026-06-01"
+        }
+      ],
+      "adjudication_hint": "公开机构负责人职务，允许查机构官网或授权发布；夹具支持该职务，故为 confirmed。"
+    },
+    {
+      "case_id": "we-dev-002-person-title-conflict",
+      "article_id": "we-dev-art-person-b",
+      "risk_category": "person_title",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市市长赵衡到兰水区调研老旧小区改造，并主持现场办公会。",
+      "claim": {
+        "text": "青石市市长赵衡",
+        "span_quote": "青石市市长赵衡",
+        "normalized_fact": "人物：赵衡；职务：青石市市长；as-of：2026-08-18"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["official_agency_page", "authorized_news_release"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "internal_newsroom_note", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_agency_page",
+          "title": "青石市人民政府领导公开信息（合成夹具）",
+          "locator": "fixture://qingshi-gov/leaders/zhao-heng",
+          "excerpt": "副市长 赵衡（分管住房和城乡建设）",
+          "as_of": "2026-05-12"
+        }
+      ],
+      "adjudication_hint": "权威来源职务为副市长，与稿件“市长”冲突，应为 conflicting，不得按官网职务自动改稿。"
+    },
+    {
+      "case_id": "we-dev-003-person-title-skip",
+      "article_id": "we-dev-art-person-skip",
+      "risk_category": "person_title",
+      "as_of": "2026-08-18",
+      "article_excerpt": "社区居民笑着说，还得麻烦张叔帮忙把通知贴到楼下。",
+      "claim": {
+        "text": "张叔",
+        "span_quote": "张叔",
+        "normalized_fact": "非正式称呼：张叔；无公开职务主张"
+      },
+      "should_trigger_query": false,
+      "query_priority": 9,
+      "allowed_source_classes": [],
+      "expected_status": "not_applicable",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "private_citizen_address", "interviewee_contact"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "口头尊称不是可核验的公开职务，不应触发查询。"
+    },
+    {
+      "case_id": "we-dev-004-org-name-conflict",
+      "article_id": "we-dev-art-org-a",
+      "risk_category": "organization_name",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本次座谈会由青石市教育委员会主办，邀请中小学校长参加。",
+      "claim": {
+        "text": "青石市教育委员会",
+        "span_quote": "青石市教育委员会",
+        "normalized_fact": "机构现行名称：青石市教育委员会；as-of：2026-08-18"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["official_agency_page", "official_gazette"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_agency_page",
+          "title": "青石市政府部门公开名录（合成夹具）",
+          "locator": "fixture://qingshi-gov/orgs/education-bureau",
+          "excerpt": "青石市教育局（不是教育委员会）",
+          "as_of": "2026-01-01"
+        }
+      ],
+      "adjudication_hint": "夹具中的现行机构名为市教育局，稿件使用教育委员会，应为 conflicting。"
+    },
+    {
+      "case_id": "we-dev-005-org-name-insufficient",
+      "article_id": "we-dev-art-org-b",
+      "risk_category": "organization_name",
+      "as_of": "2026-08-18",
+      "article_excerpt": "据介绍，澄江绿色产业协同中心将为中小企业提供检验检测服务。",
+      "claim": {
+        "text": "澄江绿色产业协同中心",
+        "span_quote": "澄江绿色产业协同中心",
+        "normalized_fact": "机构是否为依法设立并仍在用的正式名称：澄江绿色产业协同中心"
+      },
+      "should_trigger_query": true,
+      "query_priority": 2,
+      "allowed_source_classes": ["official_agency_page", "official_gazette"],
+      "expected_status": "insufficient",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "unpublished_source_identity"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "允许类别来源中没有该机构条目，不能因搜索到论坛讨论就 confirmed。"
+    },
+    {
+      "case_id": "we-dev-006-org-name-skip",
+      "article_id": "we-dev-art-org-skip",
+      "risk_category": "organization_name",
+      "as_of": "2026-08-18",
+      "article_excerpt": "有关部门表示，将继续做好防汛准备。",
+      "claim": {
+        "text": "有关部门",
+        "span_quote": "有关部门",
+        "normalized_fact": "泛称：有关部门；无具体机构名"
+      },
+      "should_trigger_query": false,
+      "query_priority": 9,
+      "allowed_source_classes": [],
+      "expected_status": "not_applicable",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "internal_newsroom_note"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "泛称不可作为联网核验对象。"
+    },
+    {
+      "case_id": "we-dev-007-policy-confirm",
+      "article_id": "we-dev-art-policy-a",
+      "risk_category": "policy_regulation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "会议要求认真执行《青石市节约用水管理办法》。该办法自2024年3月1日起施行。",
+      "claim": {
+        "text": "《青石市节约用水管理办法》自2024年3月1日起施行",
+        "span_quote": "《青石市节约用水管理办法》。该办法自2024年3月1日起施行",
+        "normalized_fact": "文件：《青石市节约用水管理办法》；施行日期：2024-03-01"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["statute_or_regulation", "official_gazette"],
+      "expected_status": "confirmed",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_gazette",
+          "title": "青石市人民政府公报（合成夹具）",
+          "locator": "fixture://qingshi-gazette/2024/water-conservation",
+          "excerpt": "《青石市节约用水管理办法》自2024年3月1日起施行",
+          "as_of": "2024-02-15"
+        }
+      ],
+      "adjudication_hint": "具名管理办法及施行日期可对照公报 confirmed。"
+    },
+    {
+      "case_id": "we-dev-008-policy-conflict",
+      "article_id": "we-dev-art-policy-b",
+      "risk_category": "policy_regulation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "执法人员依据《兰水生态保护条例（2019年）》对沿岸排污口进行排查。",
+      "claim": {
+        "text": "《兰水生态保护条例（2019年）》",
+        "span_quote": "《兰水生态保护条例（2019年）》",
+        "normalized_fact": "文件现行名称：《兰水生态保护条例（2019年）》"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["statute_or_regulation", "official_gazette"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "statute_or_regulation",
+          "title": "兰水生态保护条例文本（合成夹具）",
+          "locator": "fixture://lanshui-npc/statute/ecology-2021",
+          "excerpt": "本条例于2021年修订，应称《兰水生态保护条例（2021年修订）》",
+          "as_of": "2021-09-01"
+        }
+      ],
+      "adjudication_hint": "现行文本为2021年修订，稿件仍写2019年，应为 conflicting。"
+    },
+    {
+      "case_id": "we-dev-009-policy-skip",
+      "article_id": "we-dev-art-policy-skip",
+      "risk_category": "policy_regulation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "与会代表表示，要完整、准确、全面贯彻新发展理念，推动高质量发展。",
+      "claim": {
+        "text": "推动高质量发展",
+        "span_quote": "推动高质量发展",
+        "normalized_fact": "口号式表述，无具名法规或规划文件"
+      },
+      "should_trigger_query": false,
+      "query_priority": 9,
+      "allowed_source_classes": [],
+      "expected_status": "not_applicable",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "无具体文件名的政策口号不应触发联网核验。"
+    },
+    {
+      "case_id": "we-dev-010-date-conflict",
+      "article_id": "we-dev-art-date-a",
+      "risk_category": "date",
+      "as_of": "2026-08-18",
+      "article_excerpt": "澄江新区管委会宣布，系列文化活动将于2026年2月1日启动，当天是春节。",
+      "claim": {
+        "text": "2026年2月1日启动，当天是春节",
+        "span_quote": "2026年2月1日启动，当天是春节",
+        "normalized_fact": "日历主张：2026-02-01 为春节"
+      },
+      "should_trigger_query": true,
+      "query_priority": 2,
+      "allowed_source_classes": ["calendar_authority", "authorized_news_release"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "calendar_authority",
+          "title": "2026年部分节假日安排（合成夹具，对应公开历法）",
+          "locator": "fixture://calendar/cn/2026-spring-festival",
+          "excerpt": "2026年春节为2月17日",
+          "as_of": "2025-11-01"
+        }
+      ],
+      "adjudication_hint": "2026年春节为2月17日，稿件写成2月1日，应为 conflicting。"
+    },
+    {
+      "case_id": "we-dev-011-date-insufficient",
+      "article_id": "we-dev-art-date-b",
+      "risk_category": "date",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市人民政府定于2026年8月28日召开优化营商环境新闻发布会。",
+      "claim": {
+        "text": "定于2026年8月28日召开优化营商环境新闻发布会",
+        "span_quote": "定于2026年8月28日召开优化营商环境新闻发布会",
+        "normalized_fact": "官方日程：青石市政府 2026-08-28 举行优化营商环境新闻发布会"
+      },
+      "should_trigger_query": true,
+      "query_priority": 2,
+      "allowed_source_classes": ["official_agency_page", "authorized_news_release"],
+      "expected_status": "insufficient",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "internal_newsroom_note"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "允许来源中没有该场发布会日程，不得把未核验日期写成 confirmed。"
+    },
+    {
+      "case_id": "we-dev-012-date-skip",
+      "article_id": "we-dev-art-date-skip",
+      "risk_category": "date",
+      "as_of": "2026-08-18",
+      "article_excerpt": "记者近日在兰水区看到，新改建的便民市场已经开门营业。",
+      "claim": {
+        "text": "近日",
+        "span_quote": "近日",
+        "normalized_fact": "相对时间：近日；无具体日历日"
+      },
+      "should_trigger_query": false,
+      "query_priority": 9,
+      "allowed_source_classes": [],
+      "expected_status": "not_applicable",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "相对时间不是可核验日历事实。"
+    },
+    {
+      "case_id": "we-dev-013-number-conflict",
+      "article_id": "we-dev-art-number-a",
+      "risk_category": "number",
+      "as_of": "2026-08-18",
+      "article_excerpt": "通报称，青石市2025年粮食总产量128.6万吨，再创历史新高。",
+      "claim": {
+        "text": "青石市2025年粮食总产量128.6万吨",
+        "span_quote": "青石市2025年粮食总产量128.6万吨",
+        "normalized_fact": "指标：青石市粮食总产量；年份：2025；数值：128.6万吨"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["statistical_bulletin", "authorized_news_release"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "statistical_bulletin",
+          "title": "青石市2025年国民经济和社会发展统计公报（合成夹具）",
+          "locator": "fixture://qingshi-stats/2025-bulletin/grain",
+          "excerpt": "全年粮食总产量121.3万吨",
+          "as_of": "2026-03-20"
+        }
+      ],
+      "adjudication_hint": "统计公报为121.3万吨，与128.6万吨冲突。"
+    },
+    {
+      "case_id": "we-dev-014-number-insufficient",
+      "article_id": "we-dev-art-number-b",
+      "risk_category": "number",
+      "as_of": "2026-08-18",
+      "article_excerpt": "兰水区农业农村局预计，今年樱桃产量将达到8700吨。",
+      "claim": {
+        "text": "今年樱桃产量将达到8700吨",
+        "span_quote": "今年樱桃产量将达到8700吨",
+        "normalized_fact": "预测值：兰水区2026年樱桃产量8700吨；非已发布公报数"
+      },
+      "should_trigger_query": true,
+      "query_priority": 3,
+      "allowed_source_classes": ["statistical_bulletin", "official_agency_page"],
+      "expected_status": "insufficient",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "unpublished_source_identity"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "允许来源只有上年公报，没有该预测的官方发布，应为 insufficient。"
+    },
+    {
+      "case_id": "we-dev-015-number-skip",
+      "article_id": "we-dev-art-number-skip",
+      "risk_category": "number",
+      "as_of": "2026-08-18",
+      "article_excerpt": "座谈会持续约两个小时，与会人员随后参观了展示区。",
+      "claim": {
+        "text": "持续约两个小时",
+        "span_quote": "持续约两个小时",
+        "normalized_fact": "现场约数时长，非官方统计指标"
+      },
+      "should_trigger_query": false,
+      "query_priority": 9,
+      "allowed_source_classes": [],
+      "expected_status": "not_applicable",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "现场约数不应触发联网核验。"
+    },
+    {
+      "case_id": "we-dev-016-attribution-confirm",
+      "article_id": "we-dev-art-attr-a",
+      "risk_category": "attribution",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市统计局新闻发言人沈秋实在发布会上介绍，上半年全市固定资产投资同比增长6.2%。",
+      "claim": {
+        "text": "青石市统计局新闻发言人沈秋实在发布会上介绍，上半年全市固定资产投资同比增长6.2%",
+        "span_quote": "青石市统计局新闻发言人沈秋实在发布会上介绍，上半年全市固定资产投资同比增长6.2%",
+        "normalized_fact": "发布主体：青石市统计局新闻发言人沈秋实；场合：官方发布会；指标：上半年固投同比+6.2%"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["authorized_news_release", "statistical_bulletin", "official_agency_page"],
+      "expected_status": "confirmed",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "reporter_phone", "interviewee_contact"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "authorized_news_release",
+          "title": "青石市上半年经济运行情况发布会材料（合成夹具）",
+          "locator": "fixture://qingshi-stats/briefing/2026h1",
+          "excerpt": "新闻发言人沈秋实：上半年全市固定资产投资同比增长6.2%",
+          "as_of": "2026-07-18"
+        }
+      ],
+      "adjudication_hint": "归因于具名官方发言人，且授权发布材料一致，应为 confirmed。"
+    },
+    {
+      "case_id": "we-dev-017-attribution-conflict",
+      "article_id": "we-dev-art-attr-b",
+      "risk_category": "attribution",
+      "as_of": "2026-08-18",
+      "article_excerpt": "据国家统计局发布，青石市2025年粮食总产量121.3万吨。",
+      "claim": {
+        "text": "据国家统计局发布，青石市2025年粮食总产量121.3万吨",
+        "span_quote": "据国家统计局发布，青石市2025年粮食总产量121.3万吨",
+        "normalized_fact": "发布主体：国家统计局；指标：青石市2025年粮食总产量121.3万吨"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["statistical_bulletin", "authorized_news_release"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "statistical_bulletin",
+          "title": "青石市2025年统计公报（合成夹具）",
+          "locator": "fixture://qingshi-stats/2025-bulletin/grain",
+          "excerpt": "全市粮食总产量121.3万吨（青石市统计局发布，不是国家统计局地市快报）",
+          "as_of": "2026-03-20"
+        }
+      ],
+      "adjudication_hint": "数字或可核对，但发布主体张冠李戴，归因应为 conflicting。"
+    },
+    {
+      "case_id": "we-dev-018-attribution-skip",
+      "article_id": "we-dev-art-attr-skip",
+      "risk_category": "attribution",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报评论员认为，把便民市场建到家门口，是城市治理的温度。",
+      "claim": {
+        "text": "本报评论员认为",
+        "span_quote": "本报评论员认为",
+        "normalized_fact": "本报评论员观点，不是对外部发布主体的事实归因"
+      },
+      "should_trigger_query": false,
+      "query_priority": 9,
+      "allowed_source_classes": [],
+      "expected_status": "not_applicable",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "internal_newsroom_note"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "本报观点不是外部归因核验对象。"
+    },
+    {
+      "case_id": "we-dev-019-privacy-min",
+      "article_id": "we-dev-art-privacy",
+      "risk_category": "number",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市统计局今日发布，上半年全市居民人均可支配收入22800元。",
+      "claim": {
+        "text": "上半年全市居民人均可支配收入22800元",
+        "span_quote": "上半年全市居民人均可支配收入22800元",
+        "normalized_fact": "指标：青石市居民人均可支配收入；时期：2026H1；数值：22800元"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["statistical_bulletin", "authorized_news_release"],
+      "expected_status": "confirmed",
+      "expected_failure": null,
+      "forbidden_outbound_fields": [
+        "full_unpublished_body",
+        "reporter_phone",
+        "reporter_email",
+        "internal_newsroom_note",
+        "unpublished_source_identity",
+        "draft_watermark"
+      ],
+      "sensitive_context": {
+        "reporter_phone": "SEND-FORBIDDEN-PHONE",
+        "reporter_email": "send-forbidden@example.invalid",
+        "internal_newsroom_note": "SEND-FORBIDDEN-INTERNAL-NOTE",
+        "draft_watermark": "SEND-FORBIDDEN-DRAFT-WATERMARK"
+      },
+      "fixture_sources": [
+        {
+          "source_class": "statistical_bulletin",
+          "title": "青石市2026年上半年居民收支情况（合成夹具）",
+          "locator": "fixture://qingshi-stats/2026h1/income",
+          "excerpt": "上半年全市居民人均可支配收入22800元",
+          "as_of": "2026-07-18"
+        }
+      ],
+      "adjudication_hint": "公开统计可以查询，但记者电话、邮箱、内部选题备注和未刊水印不得进入 outbound。"
+    },
+    {
+      "case_id": "we-dev-020-degrade-timeout",
+      "article_id": "we-dev-art-degrade-timeout",
+      "risk_category": "organization_name",
+      "as_of": "2026-08-18",
+      "article_excerpt": "该项试点由青石市数据管理局会同兰水区政府组织实施。",
+      "claim": {
+        "text": "青石市数据管理局",
+        "span_quote": "青石市数据管理局",
+        "normalized_fact": "机构现行名称：青石市数据管理局"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["official_agency_page", "official_gazette"],
+      "expected_status": "insufficient",
+      "expected_failure": "timeout",
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "开发夹具设定查询超时。正确降级是 insufficient，禁止写成 confirmed。"
+    },
+    {
+      "case_id": "we-dev-021-degrade-unallowed-source",
+      "article_id": "we-dev-art-degrade-source",
+      "risk_category": "policy_regulation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "有报道称，《澄江新区夜间施工管理办法》已于上周印发。",
+      "claim": {
+        "text": "《澄江新区夜间施工管理办法》已于上周印发",
+        "span_quote": "《澄江新区夜间施工管理办法》已于上周印发",
+        "normalized_fact": "文件是否已由澄江新区正式印发：《澄江新区夜间施工管理办法》"
+      },
+      "should_trigger_query": true,
+      "query_priority": 2,
+      "allowed_source_classes": ["statute_or_regulation", "official_gazette", "official_agency_page"],
+      "expected_status": "insufficient",
+      "expected_failure": "no_allowed_source",
+      "forbidden_outbound_fields": ["full_unpublished_body", "unpublished_source_identity"],
+      "sensitive_context": {
+        "unpublished_source_identity": "SEND-FORBIDDEN-UNPUBLISHED-SOURCE"
+      },
+      "fixture_sources": [
+        {
+          "source_class": "personal_blog",
+          "title": "本地论坛转帖（合成夹具，非允许来源）",
+          "locator": "fixture://forum/night-construction-rumor",
+          "excerpt": "听说夜间施工管理办法已经发了",
+          "as_of": "2026-08-10"
+        }
+      ],
+      "adjudication_hint": "仅有博客/论坛来源时必须降级为 insufficient，不能当 confirmed。"
+    },
+    {
+      "case_id": "we-dev-022-budget-person",
+      "article_id": "we-dev-art-budget",
+      "risk_category": "person_title",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市卫生健康委主任柳南出席会议。会议由青石市卫生局办公室承办，并传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%。",
+      "claim": {
+        "text": "青石市卫生健康委主任柳南",
+        "span_quote": "青石市卫生健康委主任柳南",
+        "normalized_fact": "人物：柳南；职务：青石市卫生健康委主任"
+      },
+      "should_trigger_query": true,
+      "query_priority": 1,
+      "allowed_source_classes": ["official_agency_page", "authorized_news_release"],
+      "expected_status": "confirmed",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_agency_page",
+          "title": "青石市卫生健康委公开信息（合成夹具）",
+          "locator": "fixture://qingshi-health/leaders/liu-nan",
+          "excerpt": "主任 柳南",
+          "as_of": "2026-04-01"
+        }
+      ],
+      "adjudication_hint": "同一篇文章有4条应查询事实，每篇预算为2。本条优先级最高，合规 traces 应查询。"
+    },
+    {
+      "case_id": "we-dev-023-budget-org",
+      "article_id": "we-dev-art-budget",
+      "risk_category": "organization_name",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市卫生健康委主任柳南出席会议。会议由青石市卫生局办公室承办，并传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%。",
+      "claim": {
+        "text": "青石市卫生局办公室",
+        "span_quote": "青石市卫生局办公室",
+        "normalized_fact": "机构现行名称：青石市卫生局办公室"
+      },
+      "should_trigger_query": true,
+      "query_priority": 2,
+      "allowed_source_classes": ["official_agency_page", "official_gazette"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body", "holdout_identifier"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_agency_page",
+          "title": "青石市政府部门公开名录（合成夹具）",
+          "locator": "fixture://qingshi-gov/orgs/health-commission",
+          "excerpt": "青石市卫生健康委办公室（机构改革后不再使用卫生局）",
+          "as_of": "2024-01-01"
+        }
+      ],
+      "adjudication_hint": "旧机构名，优先级2，预算内应查询。"
+    },
+    {
+      "case_id": "we-dev-024-budget-policy",
+      "article_id": "we-dev-art-budget",
+      "risk_category": "policy_regulation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市卫生健康委主任柳南出席会议。会议由青石市卫生局办公室承办，并传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%。",
+      "claim": {
+        "text": "《青石市突发公共卫生事件应急预案（2022年版）》",
+        "span_quote": "《青石市突发公共卫生事件应急预案（2022年版）》",
+        "normalized_fact": "文件现行版本：《青石市突发公共卫生事件应急预案（2022年版）》"
+      },
+      "should_trigger_query": true,
+      "query_priority": 3,
+      "allowed_source_classes": ["statute_or_regulation", "official_agency_page"],
+      "expected_status": "conflicting",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body"],
+      "sensitive_context": {},
+      "fixture_sources": [
+        {
+          "source_class": "official_agency_page",
+          "title": "应急预案公开文本（合成夹具）",
+          "locator": "fixture://qingshi-health/plans/phec-2024",
+          "excerpt": "现行文本为《青石市突发公共卫生事件应急预案（2024年版）》",
+          "as_of": "2024-11-01"
+        }
+      ],
+      "adjudication_hint": "优先级3，超出每篇 2 次查询预算。合规 traces 应跳过；跳过记触发 FN，但预算指标仍可合规。"
+    },
+    {
+      "case_id": "we-dev-025-budget-number",
+      "article_id": "we-dev-art-budget",
+      "risk_category": "number",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市卫生健康委主任柳南出席会议。会议由青石市卫生局办公室承办，并传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%。",
+      "claim": {
+        "text": "全市疫苗接种率达到98.7%",
+        "span_quote": "全市疫苗接种率达到98.7%",
+        "normalized_fact": "指标：青石市疫苗接种率；数值：98.7%"
+      },
+      "should_trigger_query": true,
+      "query_priority": 4,
+      "allowed_source_classes": ["statistical_bulletin", "authorized_news_release", "official_agency_page"],
+      "expected_status": "insufficient",
+      "expected_failure": null,
+      "forbidden_outbound_fields": ["full_unpublished_body"],
+      "sensitive_context": {},
+      "fixture_sources": [],
+      "adjudication_hint": "优先级最低。合规 traces 在预算用尽后可跳过本条；跳过记触发 FN，但预算指标仍可合规。"
+    }
+  ]
+}

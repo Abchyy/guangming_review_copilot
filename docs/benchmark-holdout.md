@@ -10,8 +10,11 @@
 | `regression` | 同上（12 篇，原 locked） | 回归 / legacy contaminated | 否。已被 inference assets 污染并标记为 `consumed` |
 | `locked` | 不在开发 repo | 未来正式 hidden holdout | 仅当 gold 在仓库外、holdout 仍为 `available`、且经过下方协议 |
 | `protocol_fixture` | `data/benchmark/protocol-fixtures/` | 验证协议基础设施 | 否 |
+| `web_evidence_dev` | `packages/benchmark/src/web-evidence-eval/` | 轻量联网核验的公开/合成开发样例与离线评估协议 | 否。不是 holdout，也不得改名为 official locked 分数 |
 
 旧 12 篇的生命周期记录在 `data/benchmark/holdout-registry.json`。它们的 gold 仍在开发数据集中，只是为了回归，不能再写成正式 locked 分数。
+
+`web_evidence_dev` 是另一份开发评估合同，只服务未来的轻量联网核验诊断，协议见 `docs/web-evidence-eval.md`。它不读取 hidden gold，不创建 official freeze，其分数不能当作本文件中的 locked 泛化证据。
 
 未来正式 hidden gold **不得**进入本开发仓库，也不得进入开发 Agent context。
 
