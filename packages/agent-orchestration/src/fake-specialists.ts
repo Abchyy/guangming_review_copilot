@@ -7,6 +7,7 @@ import type {
   SpecialistPreliminaryFinding,
   SpecialistResult,
   SpecialistRetrievedEvidence,
+  SpecialistRunOptions,
   SpecialistTask,
 } from "@grc/contracts";
 import { parseSpecialistResult } from "@grc/contracts";
@@ -167,7 +168,7 @@ class FakeModelSpecialist implements Specialist {
     private readonly options: FakeSpecialistOptions = {},
   ) {}
 
-  async run(task: SpecialistTask): Promise<SpecialistResult> {
+  async run(task: SpecialistTask, options: SpecialistRunOptions = {}): Promise<SpecialistResult> {
     if (task.specialist !== this.id) {
       throw new SpecialistExecutionError(`task specialist ${task.specialist} does not match ${this.id}`);
     }
@@ -177,7 +178,20 @@ class FakeModelSpecialist implements Specialist {
     const started = Date.now();
     const behavior = behaviorOf(task, this.options);
     if (behavior === "timeout") {
-      await new Promise<never>(() => undefined);
+      await new Promise<never>((_, reject) => {
+        const signal = options.signal;
+        if (signal?.aborted) {
+          reject(new Error("aborted"));
+          return;
+        }
+        signal?.addEventListener(
+          "abort",
+          () => {
+            reject(new Error("aborted"));
+          },
+          { once: true },
+        );
+      });
     }
     if (behavior === "failure") {
       throw new SpecialistExecutionError(`${this.id} fake specialist failed`);

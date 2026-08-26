@@ -31,6 +31,11 @@ export type ProviderCallUsage = {
 export type SpecialistJsonCompletion = {
   system: string;
   user: string;
+  signal?: AbortSignal;
+  maxTokens?: number;
+  maxAttempts?: number;
+  maxRetries?: number;
+  timeoutMs?: number;
 };
 
 export interface ReviewModel {

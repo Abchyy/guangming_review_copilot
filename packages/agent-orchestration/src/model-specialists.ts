@@ -6,18 +6,35 @@ import type {
   Specialist,
   SpecialistFragment,
   SpecialistResult,
+  SpecialistRunOptions,
   SpecialistTask,
   SpecialistWebEvidenceItem,
 } from "@grc/contracts";
 import { parseSpecialistResult } from "@grc/contracts";
 
+import {
+  SPECIALIST_MAX_ATTEMPTS,
+  SPECIALIST_MAX_TOKENS,
+  SPECIALIST_REQUEST_TIMEOUT_MS,
+  SPECIALIST_SDK_MAX_RETRIES,
+} from "./config";
 import { SpecialistExecutionError } from "./errors";
 import { SPECIALIST_ROLE_FINDING_TYPES, SPECIALIST_ROLE_PROMPTS, isModelSpecialistId } from "./roles";
+
+export type SpecialistCompletionInput = {
+  system: string;
+  user: string;
+  signal?: AbortSignal;
+  maxTokens?: number;
+  maxAttempts?: number;
+  maxRetries?: number;
+  timeoutMs?: number;
+};
 
 export type SpecialistCompletionClient = {
   readonly provider: ReviewProvider;
   readonly model: string | null;
-  completeJson(input: { system: string; user: string }): Promise<ReviewCandidate[]>;
+  completeJson(input: SpecialistCompletionInput): Promise<ReviewCandidate[]>;
 };
 
 export function buildSpecialistUserPrompt(task: SpecialistTask): string {
@@ -235,7 +252,7 @@ export class ModelSpecialist implements Specialist {
     this.model = client.model;
   }
 
-  async run(task: SpecialistTask): Promise<SpecialistResult> {
+  async run(task: SpecialistTask, options: SpecialistRunOptions = {}): Promise<SpecialistResult> {
     if (task.specialist !== this.id) {
       throw new SpecialistExecutionError(`task specialist ${task.specialist} does not match ${this.id}`);
     }
@@ -255,6 +272,11 @@ export class ModelSpecialist implements Specialist {
     const raw = await this.client.completeJson({
       system: SPECIALIST_ROLE_PROMPTS[this.id],
       user,
+      signal: options.signal,
+      maxTokens: SPECIALIST_MAX_TOKENS,
+      maxAttempts: SPECIALIST_MAX_ATTEMPTS,
+      maxRetries: SPECIALIST_SDK_MAX_RETRIES,
+      timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
     });
     const candidates = sanitizeSpecialistCandidates(this.id, task, raw);
     return parseSpecialistResult({

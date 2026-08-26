@@ -21,21 +21,28 @@ import {
 import { FixtureReviewModel } from "@grc/providers";
 import { createReview } from "@grc/review-core";
 import {
+  DEFAULT_MODEL_SPECIALIST_DEADLINE_MS,
+  DEFAULT_SPECIALIST_MAX_CANDIDATES,
   FACT_CHECK_FINDING_TYPES,
   FakeFactCheckSpecialist,
   FakeNewsEditSpecialist,
   NEWS_EDIT_FINDING_TYPES,
   SPECIALIST_DISAGREEMENT_MESSAGE,
   SPECIALIST_FAILURE_MESSAGE,
+  SPECIALIST_MAX_ATTEMPTS,
+  SPECIALIST_MAX_TOKENS,
   SPECIALIST_PARTIAL_FAILURE_MESSAGE,
+  SPECIALIST_REQUEST_TIMEOUT_MS,
   SPECIALIST_ROLE_PROMPTS,
   SPECIALIST_ROLE_TITLES,
+  SPECIALIST_SDK_MAX_RETRIES,
   SPECIALIST_TARGET_MODEL,
   SPECIALIST_TIMEOUT_MESSAGE,
   createFakeSpecialists,
   createModelSpecialists,
   createSpecialistOrchestrator,
   createSpecialistOrchestratorFromEnv,
+  createSpecialistRuntime,
   createSpecialistRuntimeFromEnv,
   extractFragments,
   isSpecialistOrchestrationEnabled,
@@ -192,16 +199,16 @@ describe("agent orchestration foundation", () => {
     const recording: Specialist[] = [
       {
         id: "fact_check",
-        run(task) {
+        run(task, options) {
           seen.push(task);
-          return fact.run(task);
+          return fact.run(task, options);
         },
       },
       {
         id: "news_edit",
-        run(task) {
+        run(task, options) {
           seen.push(task);
-          return news.run(task);
+          return news.run(task, options);
         },
       },
     ];
@@ -423,16 +430,16 @@ describe("agent orchestration foundation", () => {
     const recording: Specialist[] = [
       {
         id: "fact_check",
-        run(task) {
+        run(task, options) {
           seen.push(task);
-          return fact.run(task);
+          return fact.run(task, options);
         },
       },
       {
         id: "news_edit",
-        run(task) {
+        run(task, options) {
           seen.push(task);
-          return news.run(task);
+          return news.run(task, options);
         },
       },
     ];
@@ -790,5 +797,135 @@ describe("DeepSeek specialist adapter", () => {
         citation_validated: false,
       },
     ]);
+  });
+
+  test("model specialists use a single attempt, 12s request timeout, 15s deadline, and a smaller candidate budget", async () => {
+    const calls: Array<{
+      maxTokens?: number;
+      maxAttempts?: number;
+      maxRetries?: number;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+    }> = [];
+    const tasks: SpecialistTask[] = [];
+    const inner = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      async completeJson(input) {
+        calls.push(input);
+        return [];
+      },
+    }));
+    const specialists: Specialist[] = inner.map((specialist) => ({
+      id: specialist.id,
+      provider: specialist.provider,
+      model: specialist.model,
+      run(task, options) {
+        tasks.push(task);
+        return specialist.run(task, options);
+      },
+    }));
+    const run = await createSpecialistRuntime(specialists).orchestrate({
+      article,
+      findings: [personFinding, consistencyFinding],
+    });
+
+    expect(DEFAULT_MODEL_SPECIALIST_DEADLINE_MS).toBe(15_000);
+    expect(SPECIALIST_REQUEST_TIMEOUT_MS).toBe(12_000);
+    expect(DEFAULT_SPECIALIST_MAX_CANDIDATES).toBe(3);
+    expect(SPECIALIST_MAX_TOKENS).toBe(2048);
+    expect(SPECIALIST_MAX_ATTEMPTS).toBe(1);
+    expect(SPECIALIST_SDK_MAX_RETRIES).toBe(0);
+    expect(run.dispatched).toEqual(["fact_check", "news_edit"]);
+    expect(tasks).toHaveLength(2);
+    expect(tasks.every((task) => task.constraints.deadlineMs === 15_000)).toBe(true);
+    expect(tasks.every((task) => task.constraints.maxCandidates === 3)).toBe(true);
+    expect(calls).toHaveLength(2);
+    expect(
+      calls.every(
+        (item) =>
+          item.maxAttempts === 1 &&
+          item.maxRetries === 0 &&
+          item.maxTokens === 2048 &&
+          item.timeoutMs === 12_000 &&
+          item.signal instanceof AbortSignal,
+      ),
+    ).toBe(true);
+  });
+
+  test("orchestration deadline aborts the specialist HTTP request and degrades to 待人工核实", async () => {
+    let aborted = false;
+    let createCalls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson(input) {
+        createCalls += 1;
+        return new Promise<never>((_, reject) => {
+          const signal = input.signal;
+          if (signal?.aborted) {
+            aborted = true;
+            reject(new Error("aborted"));
+            return;
+          }
+          signal?.addEventListener(
+            "abort",
+            () => {
+              aborted = true;
+              reject(new Error("aborted"));
+            },
+            { once: true },
+          );
+        });
+      },
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { deadlineMs: 30 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+
+    expect(aborted).toBe(true);
+    expect(createCalls).toBe(1);
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.provenance.status).toBe("timed_out");
+    expect(fact?.candidates).toEqual([]);
+    expect(
+      run.judgments.some(
+        (item) =>
+          item.decision === "verify" &&
+          item.requires_verification &&
+          (item.reason === SPECIALIST_TIMEOUT_MESSAGE ||
+            item.reason === SPECIALIST_PARTIAL_FAILURE_MESSAGE),
+      ),
+    ).toBe(true);
+  });
+
+  test("a retryable specialist provider failure is not retried and still degrades to 待人工核实", async () => {
+    let createCalls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        createCalls += 1;
+        return Promise.reject(new Error("malformed JSON"));
+      },
+    }));
+    const run = await createSpecialistRuntime(specialists).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+
+    expect(createCalls).toBe(1);
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.provenance.status).toBe("failed");
+    expect(fact?.candidates).toEqual([]);
+    expect(
+      run.judgments.some(
+        (item) =>
+          item.decision === "verify" &&
+          item.requires_verification &&
+          item.reason === SPECIALIST_FAILURE_MESSAGE,
+      ),
+    ).toBe(true);
   });
 });

@@ -64,10 +64,61 @@ export type OfficialDeepSeekExecutionBinding = {
   account_boundary_id: string;
 };
 
+type ChatCompletionRequestOptions = {
+  signal?: AbortSignal;
+  maxRetries?: number;
+  timeout?: number;
+};
+
+function buildChatRequestOptions(options: {
+  signal?: AbortSignal;
+  maxRetries?: number;
+  timeoutMs?: number;
+}): { requestOptions: ChatCompletionRequestOptions | undefined; cleanup: () => void } {
+  const requestOptions: ChatCompletionRequestOptions = {};
+  const localController = options.timeoutMs != null ? new AbortController() : undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const onParentAbort = () => {
+    localController?.abort();
+  };
+
+  if (localController && options.timeoutMs != null) {
+    if (options.signal?.aborted) {
+      localController.abort();
+    } else {
+      options.signal?.addEventListener("abort", onParentAbort, { once: true });
+    }
+    timer = setTimeout(() => {
+      localController.abort();
+    }, options.timeoutMs);
+    requestOptions.signal = localController.signal;
+    requestOptions.timeout = options.timeoutMs;
+  } else if (options.signal) {
+    requestOptions.signal = options.signal;
+  }
+
+  if (options.maxRetries != null) {
+    requestOptions.maxRetries = options.maxRetries;
+  }
+
+  return {
+    requestOptions: Object.keys(requestOptions).length > 0 ? requestOptions : undefined,
+    cleanup: () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      options.signal?.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
 type ChatCompletionsClient = {
   chat: {
     completions: {
-      create: (params: Record<string, unknown>) => Promise<{
+      create: (
+        params: Record<string, unknown>,
+        options?: ChatCompletionRequestOptions,
+      ) => Promise<{
         model?: string | null;
         choices?: Array<{ message?: { content?: string | null } }>;
         usage?: {
@@ -171,16 +222,23 @@ export class DeepSeekReviewModel implements ReviewModel {
     const startedAt = Date.now();
     const attempts: ProviderAttempt[] = [];
     let lastError: unknown;
+    const maxAttempts = input.maxAttempts ?? DEEPSEEK_RETRY_POLICY.max_attempts;
+    const maxTokens = input.maxTokens ?? DEEPSEEK_RETRY_POLICY.max_tokens;
 
-    for (let attempt = 1; attempt <= DEEPSEEK_RETRY_POLICY.max_attempts; attempt += 1) {
-      const result = await this.completeOnce(input.system, input.user, attempt);
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const result = await this.completeOnce(input.system, input.user, attempt, {
+        signal: input.signal,
+        maxRetries: input.maxRetries,
+        maxTokens,
+        timeoutMs: input.timeoutMs,
+      });
       attempts.push(result.attempt);
       if (result.ok) {
         this.commitProvenance(attempts, startedAt);
         return result.candidates;
       }
       lastError = result.error;
-      if (attempt < DEEPSEEK_RETRY_POLICY.max_attempts && isRetryable(lastError)) {
+      if (attempt < maxAttempts && isRetryable(lastError)) {
         continue;
       }
       this.commitProvenance(attempts, startedAt);
@@ -209,6 +267,12 @@ export class DeepSeekReviewModel implements ReviewModel {
     system: string,
     user: string,
     attempt: number,
+    options: {
+      signal?: AbortSignal;
+      maxRetries?: number;
+      maxTokens: number;
+      timeoutMs?: number;
+    },
   ): Promise<
     | { ok: true; candidates: ReviewCandidate[]; attempt: ProviderAttempt }
     | { ok: false; error: unknown; attempt: ProviderAttempt }
@@ -216,9 +280,10 @@ export class DeepSeekReviewModel implements ReviewModel {
     let observedModel: string | null = null;
     let usage = null as ReturnType<typeof extractObservedUsage>;
     let receivedProviderResponse = false;
+    const { requestOptions, cleanup } = buildChatRequestOptions(options);
 
     try {
-      const response = await this.client.chat.completions.create({
+      const body = {
         model: this.model,
         messages: [
           {
@@ -230,11 +295,13 @@ export class DeepSeekReviewModel implements ReviewModel {
             content: user,
           },
         ],
-
         response_format: { type: "json_object" },
-        max_tokens: DEEPSEEK_RETRY_POLICY.max_tokens,
+        max_tokens: options.maxTokens,
         extra_body: { thinking: { type: "disabled" } },
-      });
+      };
+      const response = await (requestOptions
+        ? this.client.chat.completions.create(body, requestOptions)
+        : this.client.chat.completions.create(body));
       receivedProviderResponse = true;
       observedModel = observedString(response.model);
       usage = extractObservedUsage(response.usage);
@@ -307,6 +374,8 @@ export class DeepSeekReviewModel implements ReviewModel {
           error: wrapped,
         }),
       };
+    } finally {
+      cleanup();
     }
   }
 }

@@ -151,10 +151,11 @@ async function runOne(
   nowMs: () => number,
 ): Promise<SpecialistResult> {
   const started = nowMs();
-  const work = specialist.run(task);
-  void work.catch(() => undefined);
   try {
-    const raw = await withDeadline(work, task.constraints.deadlineMs);
+    const raw = await withDeadline(
+      (signal) => specialist.run(task, { signal }),
+      task.constraints.deadlineMs,
+    );
     const parsed = parseSpecialistResult(raw);
     return {
       ...parsed,

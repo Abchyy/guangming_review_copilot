@@ -185,11 +185,15 @@ export interface SpecialistRuntime {
   orchestrate(input: SpecialistRuntimeInput): Promise<SpecialistOrchestrationRun>;
 }
 
+export type SpecialistRunOptions = {
+  signal?: AbortSignal;
+};
+
 export interface Specialist {
   readonly id: SpecialistId;
   readonly provider?: ReviewProvider | null;
   readonly model?: string | null;
-  run(task: SpecialistTask): Promise<SpecialistResult>;
+  run(task: SpecialistTask, options?: SpecialistRunOptions): Promise<SpecialistResult>;
 }
 
 export class SpecialistContractError extends Error {

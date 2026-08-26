@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { DeepSeekReviewModel } from "@grc/providers";
+import { DeepSeekReviewModel, DEEPSEEK_RETRY_POLICY } from "@grc/providers";
 import { parseLlmReviewOutput, ReviewProviderError } from "@grc/contracts";
 
 const validOutput = {
@@ -76,13 +76,16 @@ describe("DeepSeek review model", () => {
     expect(provenance?.aggregated_usage.cached_input_tokens_status).toBe("not_reported");
     const arg = create.mock.calls[0]?.[0] as {
       model: string;
+      max_tokens: number;
       response_format: { type: string };
       extra_body: { thinking: { type: string } };
       messages: Array<{ content: string }>;
     };
     expect(arg.model).toBe("deepseek-v4-flash");
+    expect(arg.max_tokens).toBe(DEEPSEEK_RETRY_POLICY.max_tokens);
     expect(arg.response_format).toEqual({ type: "json_object" });
     expect(arg.extra_body.thinking.type).toBe("disabled");
+    expect(create.mock.calls[0]?.[1]).toBeUndefined();
     expect(arg.messages[0]?.content.toLowerCase()).toContain("json");
     expect(parseLlmReviewOutput({ candidates }).candidates).toHaveLength(1);
   });
@@ -115,6 +118,15 @@ describe("DeepSeek review model", () => {
     const candidates = await model.review({ title: "标题", body: "座谈谈会", version: 1 });
     expect(create).toHaveBeenCalledTimes(2);
     expect(candidates).toHaveLength(1);
+    expect(DEEPSEEK_RETRY_POLICY).toEqual({
+      max_attempts: 2,
+      timeout_ms: 60_000,
+      max_tokens: 8192,
+    });
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ max_tokens: 8192 });
+    expect(create.mock.calls[1]?.[0]).toMatchObject({ max_tokens: 8192 });
+    expect(create.mock.calls[0]?.[1]).toBeUndefined();
+    expect(create.mock.calls[1]?.[1]).toBeUndefined();
     const provenance = model.consumeLastProvenance();
     expect(provenance?.attempt_count).toBe(2);
     expect(provenance?.aggregated_usage.input_tokens).toBe(30);
@@ -204,5 +216,105 @@ describe("DeepSeek review model", () => {
     expect(provenance?.aggregated_usage.input_tokens).toBeNull();
     expect(provenance?.aggregated_usage.input_tokens_completeness).toBe("incomplete");
     expect(provenance?.aggregated_usage.cached_input_tokens).toBeNull();
+  });
+
+  test("specialist completeJson does not retry and forwards a smaller budget, timeout, and abort", async () => {
+    const create = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: "not-json" } }],
+    });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+    const controller = new AbortController();
+    await expect(
+      model.completeJson({
+        system: "事实核验专家",
+        user: "quote=市教育局局长王海涛",
+        maxAttempts: 1,
+        maxRetries: 0,
+        maxTokens: 2048,
+        timeoutMs: 12_000,
+        signal: controller.signal,
+      }),
+    ).rejects.toBeInstanceOf(ReviewProviderError);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ max_tokens: 2048 });
+    expect(create.mock.calls[0]?.[1]).toMatchObject({
+      maxRetries: 0,
+      timeout: 12_000,
+    });
+    expect(create.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(DEEPSEEK_RETRY_POLICY.max_attempts).toBe(2);
+    expect(DEEPSEEK_RETRY_POLICY.timeout_ms).toBe(60_000);
+    expect(DEEPSEEK_RETRY_POLICY.max_tokens).toBe(8192);
+  });
+
+  test("specialist request timeout aborts the in-flight provider call instead of leaving it running", async () => {
+    let aborted = false;
+    const create = vi.fn(
+      (_body: unknown, options?: { signal?: AbortSignal; timeout?: number; maxRetries?: number }) => {
+        return new Promise((_resolve, reject) => {
+          const signal = options?.signal;
+          if (signal?.aborted) {
+            aborted = true;
+            reject(new Error("aborted"));
+            return;
+          }
+          signal?.addEventListener(
+            "abort",
+            () => {
+              aborted = true;
+              reject(new Error("aborted"));
+            },
+            { once: true },
+          );
+        });
+      },
+    );
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+    const started = Date.now();
+    await expect(
+      model.completeJson({
+        system: "事实核验专家",
+        user: "quote=市教育局局长王海涛",
+        maxAttempts: 1,
+        maxRetries: 0,
+        maxTokens: 2048,
+        timeoutMs: 25,
+      }),
+    ).rejects.toBeInstanceOf(ReviewProviderError);
+    expect(aborted).toBe(true);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[1]).toMatchObject({
+      maxRetries: 0,
+      timeout: 25,
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  test("review() keeps retrying after a retryable failure even when specialist overrides exist on the class", async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: "" } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(validOutput) } }],
+      });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      timeoutMs: 12_000,
+      client: { chat: { completions: { create } } } as never,
+    });
+    const candidates = await model.review({ title: "标题", body: "座谈谈会", version: 1 });
+    expect(candidates).toHaveLength(1);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ max_tokens: 8192 });
+    expect(create.mock.calls[0]?.[1]).toBeUndefined();
+    expect(create.mock.calls[1]?.[1]).toBeUndefined();
   });
 });

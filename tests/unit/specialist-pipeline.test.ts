@@ -71,9 +71,9 @@ function recordingRuntime(inner: Specialist[]): {
     id: specialist.id,
     provider: specialist.provider,
     model: specialist.model,
-    run(task) {
+    run(task, options) {
       seen.push(task);
-      return specialist.run(task);
+      return specialist.run(task, options);
     },
   }));
   return { runtime: createSpecialistRuntime(recorded, { nowMs: () => 0 }), seen };

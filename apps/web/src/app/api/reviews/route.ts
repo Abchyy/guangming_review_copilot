@@ -8,6 +8,7 @@ import {
 } from "@grc/contracts";
 import {
   createSpecialistRuntimeFromEnv,
+  SPECIALIST_REQUEST_TIMEOUT_MS,
   SPECIALIST_TARGET_MODEL,
 } from "@grc/agent-orchestration";
 import {
@@ -55,6 +56,7 @@ export function createProductSpecialistRuntime(): SpecialistRuntime | null {
       new DeepSeekReviewModel({
         apiKey,
         model: SPECIALIST_TARGET_MODEL,
+        timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
       }),
   });
 }
