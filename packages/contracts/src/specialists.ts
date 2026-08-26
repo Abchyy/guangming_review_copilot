@@ -8,10 +8,15 @@ import {
   SEVERITIES,
   aggregatedUsageSchema,
   articleSchema,
+  observedModelStatusSchema,
+  providerAttemptSchema,
   reviewCandidateSchema,
   sourceSpanSchema,
   suggestionSchema,
+  type AggregatedUsage,
   type CanonicalArticle,
+  type ProviderAttempt,
+  type ReviewExecutionProvenance,
   type ReviewProvider,
 } from "./review";
 import {
@@ -48,6 +53,69 @@ export const SPECIALIST_DISAGREEMENT_MESSAGE = "专家结论存在分歧，待�
 export const SPECIALIST_PARTIAL_FAILURE_MESSAGE = "专项核验部分失败，待人工核实";
 export const SPECIALIST_TIMEOUT_MESSAGE = "专项核验超时，待人工核实";
 export const SPECIALIST_FAILURE_MESSAGE = "专项核验失败，待人工核实";
+
+export const SPECIALIST_TRACE_STATUSES = ["observed", "unobserved"] as const;
+
+export type SpecialistTraceStatus = (typeof SPECIALIST_TRACE_STATUSES)[number];
+
+export function unobservedSpecialistCallFields(): {
+  trace_status: SpecialistTraceStatus;
+  observed_response_model: null;
+  observed_response_model_status: "not_reported";
+  attempt_count: 0;
+  attempts: [];
+  aggregated_usage: AggregatedUsage;
+} {
+  return {
+    trace_status: "unobserved",
+    observed_response_model: null,
+    observed_response_model_status: "not_reported",
+    attempt_count: 0,
+    attempts: [],
+    aggregated_usage: unobservedAggregatedUsage(0),
+  };
+}
+
+export function unobservedAggregatedUsage(unobservedAttempts = 0): AggregatedUsage {
+  return {
+    input_tokens: null,
+    input_tokens_completeness: "not_observed",
+    output_tokens: null,
+    output_tokens_completeness: "not_observed",
+    cached_input_tokens: null,
+    cached_input_tokens_status: "not_reported",
+    cached_input_tokens_completeness: "not_observed",
+    unobserved_usage_attempts: unobservedAttempts,
+  };
+}
+
+export function specialistCallTrace(execution: ReviewExecutionProvenance | null): {
+  trace_status: SpecialistTraceStatus;
+  observed_response_model: string | null;
+  observed_response_model_status: ReviewExecutionProvenance["observed_response_model_status"];
+  attempt_count: number;
+  attempts: ProviderAttempt[];
+  aggregated_usage: AggregatedUsage;
+} {
+  if (!execution) {
+    return {
+      trace_status: "unobserved",
+      observed_response_model: null,
+      observed_response_model_status: "not_reported",
+      attempt_count: 0,
+      attempts: [],
+      aggregated_usage: unobservedAggregatedUsage(1),
+    };
+  }
+  return {
+    trace_status: "observed",
+    observed_response_model: execution.observed_response_model,
+    observed_response_model_status: execution.observed_response_model_status,
+    attempt_count: execution.attempt_count,
+    attempts: execution.attempts,
+    aggregated_usage: execution.aggregated_usage,
+  };
+}
 
 export const specialistRetrievedEvidenceSchema = z.object({
   source_id: z.string().min(1),
@@ -119,9 +187,12 @@ export const agentExecutionProvenanceSchema = z.object({
   provider: z.enum(REVIEW_PROVIDERS).nullable(),
   model: z.string().nullable(),
   elapsedMs: z.number().nonnegative(),
-  observed_response_model: z.string().nullable().optional(),
-  attempt_count: z.number().int().nonnegative().optional(),
-  aggregated_usage: aggregatedUsageSchema.optional(),
+  trace_status: z.enum(SPECIALIST_TRACE_STATUSES).default("unobserved"),
+  observed_response_model: z.string().nullable().default(null),
+  observed_response_model_status: observedModelStatusSchema.default("not_reported"),
+  attempt_count: z.number().int().nonnegative().default(0),
+  attempts: z.array(providerAttemptSchema).default([]),
+  aggregated_usage: aggregatedUsageSchema.default(() => unobservedAggregatedUsage(0)),
 });
 
 export const specialistResultSchema = z.object({
@@ -183,6 +254,7 @@ export type SpecialistRuntimeInput = {
   findings: readonly SpecialistPreliminaryFinding[];
   retrievedEvidence?: readonly SpecialistRetrievedEvidence[];
   webEvidence?: WebEvidenceRun;
+  signal?: AbortSignal;
 };
 
 export interface SpecialistRuntime {

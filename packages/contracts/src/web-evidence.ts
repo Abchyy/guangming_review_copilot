@@ -159,6 +159,7 @@ export type WebEvidenceCollectInput = {
   findings: ReadonlyArray<Pick<Finding, "type" | "title" | "reason" | "source_span">>;
   language?: string;
   region?: string;
+  signal?: AbortSignal;
 };
 
 export interface WebEvidenceCollector {

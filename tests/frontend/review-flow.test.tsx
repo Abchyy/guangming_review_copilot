@@ -20,6 +20,7 @@ import {
   WEB_EVIDENCE_RETRIEVED_MESSAGE,
   WEB_EVIDENCE_UNVERIFIED_MESSAGE,
   specialistOrchestrationRunSchema,
+  unobservedSpecialistCallFields,
 } from "@grc/contracts";
 
 const articleBody = "第一段有错别字座谈谈会。\n\n第二段写王强在总结时强调。";
@@ -207,6 +208,7 @@ function specialistRun(extras: Partial<SpecialistOrchestrationRun> = {}): Specia
           provider: "fixture",
           model: "fake-specialist",
           elapsedMs: 12,
+          ...unobservedSpecialistCallFields(),
         },
         warnings: [],
       },
@@ -244,6 +246,7 @@ function specialistRun(extras: Partial<SpecialistOrchestrationRun> = {}): Specia
           provider: "fixture",
           model: "fake-specialist",
           elapsedMs: 9,
+          ...unobservedSpecialistCallFields(),
         },
         warnings: [],
       },
@@ -881,6 +884,7 @@ describe("specialist orchestration review wiring", () => {
             provider: "fixture",
             model: "fake-specialist",
             elapsedMs: 2000,
+            ...unobservedSpecialistCallFields(),
           },
           warnings: [TIMEOUT_REASON],
         },
@@ -918,6 +922,7 @@ describe("specialist orchestration review wiring", () => {
             provider: "fixture",
             model: "fake-specialist",
             elapsedMs: 11,
+            ...unobservedSpecialistCallFields(),
           },
           warnings: [],
         },

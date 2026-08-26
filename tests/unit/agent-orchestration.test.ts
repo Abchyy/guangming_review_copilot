@@ -572,13 +572,88 @@ describe("DeepSeek specialist adapter", () => {
     expect(
       run.results.every(
         (item) =>
+          item.provenance.trace_status === "observed" &&
           item.provenance.observed_response_model === "deepseek-v4-flash" &&
           item.provenance.attempt_count === 1 &&
-          item.provenance.aggregated_usage?.output_tokens === 20,
+          item.provenance.aggregated_usage.output_tokens === 20,
       ),
     ).toBe(true);
-    const inputTokens = run.results.map((item) => item.provenance.aggregated_usage?.input_tokens);
+    const inputTokens = run.results.map((item) => item.provenance.aggregated_usage.input_tokens);
     expect(new Set(inputTokens).size).toBe(2);
+  });
+
+  test("failed specialist calls keep attempts and usage for cost audit", async () => {
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.reject(new Error("malformed JSON")),
+      consumeLastProvenance() {
+        return {
+          adapter_provider: "deepseek",
+          requested_model: "deepseek-v4-flash",
+          observed_response_model: "deepseek-v4-flash",
+          observed_response_model_status: "observed",
+          attempt_count: 1,
+          attempts: [
+            {
+              attempt: 1,
+              outcome: "retryable_failure",
+              requested_model: "deepseek-v4-flash",
+              observed_response_model: "deepseek-v4-flash",
+              received_provider_response: true,
+              usage: {
+                input_tokens: 80,
+                output_tokens: 12,
+                cached_input_tokens: 0,
+                cached_input_tokens_status: "reported",
+              },
+              error: "malformed JSON",
+            },
+          ],
+          aggregated_usage: {
+            input_tokens: 80,
+            input_tokens_completeness: "complete",
+            output_tokens: 12,
+            output_tokens_completeness: "complete",
+            cached_input_tokens: 0,
+            cached_input_tokens_status: "reported",
+            cached_input_tokens_completeness: "complete",
+            unobserved_usage_attempts: 0,
+          },
+          application_cache: { enabled: false, hit: false },
+          latency_ms: 40,
+        };
+      },
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.provenance.status).toBe("failed");
+    expect(fact?.provenance.trace_status).toBe("observed");
+    expect(fact?.provenance.attempts).toHaveLength(1);
+    expect(fact?.provenance.attempts[0]?.usage?.input_tokens).toBe(80);
+    expect(fact?.provenance.aggregated_usage.input_tokens_completeness).toBe("complete");
+  });
+
+  test("unobserved specialist failures are labeled unobserved instead of guessed", async () => {
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.reject(new Error("boom")),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.provenance.status).toBe("failed");
+    expect(fact?.provenance.trace_status).toBe("unobserved");
+    expect(fact?.provenance.observed_response_model).toBeNull();
+    expect(fact?.provenance.attempts).toEqual([]);
+    expect(fact?.provenance.aggregated_usage.input_tokens_completeness).toBe("not_observed");
+    expect(fact?.provenance.aggregated_usage.unobserved_usage_attempts).toBe(1);
   });
 
   test("drops basic_text and quotes that are not in the current task fragments", async () => {

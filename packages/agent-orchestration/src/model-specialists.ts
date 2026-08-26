@@ -11,7 +11,12 @@ import type {
   SpecialistTask,
   SpecialistWebEvidenceItem,
 } from "@grc/contracts";
-import { parseSpecialistResult } from "@grc/contracts";
+import {
+  SPECIALIST_FAILURE_MESSAGE,
+  SPECIALIST_TIMEOUT_MESSAGE,
+  parseSpecialistResult,
+  specialistCallTrace,
+} from "@grc/contracts";
 
 import {
   SPECIALIST_MAX_ATTEMPTS,
@@ -271,39 +276,70 @@ export class ModelSpecialist implements Specialist {
       preliminaryFindings: task.preliminaryFindings.filter((item) => allowedTypes.has(item.type)),
     };
     const user = buildSpecialistUserPrompt(promptTask);
-    const raw = await this.client.completeJson({
-      system: SPECIALIST_ROLE_PROMPTS[this.id],
-      user,
-      signal: options.signal,
-      maxTokens: SPECIALIST_MAX_TOKENS,
-      maxAttempts: SPECIALIST_MAX_ATTEMPTS,
-      maxRetries: SPECIALIST_SDK_MAX_RETRIES,
-      timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
-    });
-    const execution = this.client.consumeLastProvenance?.() ?? null;
-    const candidates = sanitizeSpecialistCandidates(this.id, task, raw);
-    return parseSpecialistResult({
-      taskId: task.taskId,
-      candidates,
-      provenance: {
+    try {
+      const raw = await this.client.completeJson({
+        system: SPECIALIST_ROLE_PROMPTS[this.id],
+        user,
+        signal: options.signal,
+        maxTokens: SPECIALIST_MAX_TOKENS,
+        maxAttempts: SPECIALIST_MAX_ATTEMPTS,
+        maxRetries: SPECIALIST_SDK_MAX_RETRIES,
+        timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
+      });
+      const execution = this.client.consumeLastProvenance?.() ?? null;
+      const candidates = sanitizeSpecialistCandidates(this.id, task, raw);
+      return parseSpecialistResult({
         taskId: task.taskId,
-        specialist: this.id,
-        invoked: true,
-        status: "succeeded",
-        provider: this.provider,
-        model: this.model,
-        elapsedMs: Math.max(0, Date.now() - started),
-        ...(execution
-          ? {
-              observed_response_model: execution.observed_response_model,
-              attempt_count: execution.attempt_count,
-              aggregated_usage: execution.aggregated_usage,
-            }
-          : {}),
-      },
-      warnings: [],
-    });
+        candidates,
+        provenance: {
+          taskId: task.taskId,
+          specialist: this.id,
+          invoked: true,
+          status: "succeeded",
+          provider: this.provider,
+          model: this.model,
+          elapsedMs: Math.max(0, Date.now() - started),
+          ...specialistCallTrace(execution),
+        },
+        warnings: [],
+      });
+    } catch (error) {
+      const execution = this.client.consumeLastProvenance?.() ?? null;
+      const timedOut = options.signal?.aborted === true || isAbortLike(error);
+      return parseSpecialistResult({
+        taskId: task.taskId,
+        candidates: [],
+        provenance: {
+          taskId: task.taskId,
+          specialist: this.id,
+          invoked: true,
+          status: timedOut ? "timed_out" : "failed",
+          provider: this.provider,
+          model: this.model,
+          elapsedMs: Math.max(0, Date.now() - started),
+          ...specialistCallTrace(execution),
+        },
+        warnings: [timedOut ? SPECIALIST_TIMEOUT_MESSAGE : messageOf(error)],
+      });
+    }
   }
+}
+
+function isAbortLike(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "name" in error) {
+    const name = String((error as { name?: unknown }).name);
+    if (name === "AbortError" || name === "TimeoutError" || name === "APIUserAbortError") {
+      return true;
+    }
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /aborted|timed out|timeout/i.test(message);
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error && error.message.trim().length > 0
+    ? error.message
+    : SPECIALIST_FAILURE_MESSAGE;
 }
 
 export function createModelSpecialists(

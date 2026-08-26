@@ -120,7 +120,10 @@ export class FakeSearchProvider implements SearchProvider {
     this.now = options.now ?? (() => new Date());
   }
 
-  search(query: WebEvidenceQuery): Promise<WebEvidenceResult> {
+  search(query: WebEvidenceQuery, options?: { signal?: AbortSignal }): Promise<WebEvidenceResult> {
+    if (options?.signal?.aborted) {
+      return Promise.reject(new SearchProviderTimeoutError());
+    }
     const behavior = this.behaviorFor?.(query) ?? this.behavior;
     if (behavior === "timeout") {
       return Promise.reject(new SearchProviderTimeoutError());

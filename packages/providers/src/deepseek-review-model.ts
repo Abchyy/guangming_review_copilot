@@ -131,8 +131,34 @@ type ChatCompletionsClient = {
   };
 };
 
+function isAbortError(error: unknown): boolean {
+  if (error == null) {
+    return false;
+  }
+  if (typeof error === "object" && "name" in error) {
+    const name = String((error as { name?: unknown }).name);
+    if (name === "AbortError" || name === "TimeoutError" || name === "APIUserAbortError") {
+      return true;
+    }
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (/aborted|AbortError/i.test(message)) {
+    return true;
+  }
+  if (error instanceof ReviewProviderError && error.cause) {
+    return isAbortError(error.cause);
+  }
+  return false;
+}
+
 function isRetryable(error: unknown): boolean {
+  if (isAbortError(error)) {
+    return false;
+  }
   if (error instanceof ReviewProviderError) {
+    if (error.cause && isAbortError(error.cause)) {
+      return false;
+    }
     return (
       error.message.includes("schema") ||
       error.message.includes("empty") ||
@@ -215,6 +241,8 @@ export class DeepSeekReviewModel implements ReviewModel {
     return this.completeJson({
       system: buildReviewSystemPrompt(context),
       user: buildReviewUserPrompt(article.title, article.body, context),
+      signal: context.signal,
+      timeoutMs: context.timeoutMs,
     });
   }
 
@@ -226,6 +254,10 @@ export class DeepSeekReviewModel implements ReviewModel {
     const maxTokens = input.maxTokens ?? DEEPSEEK_RETRY_POLICY.max_tokens;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (input.signal?.aborted) {
+        lastError = new ReviewProviderError("DeepSeek provider unavailable");
+        break;
+      }
       const result = await this.completeOnce(input.system, input.user, attempt, {
         signal: input.signal,
         maxRetries: input.maxRetries,
@@ -238,7 +270,7 @@ export class DeepSeekReviewModel implements ReviewModel {
         return result.candidates;
       }
       lastError = result.error;
-      if (attempt < maxAttempts && isRetryable(lastError)) {
+      if (attempt < maxAttempts && isRetryable(lastError) && !input.signal?.aborted) {
         continue;
       }
       this.commitProvenance(attempts, startedAt);

@@ -102,10 +102,20 @@ export class TavilySearchProvider implements SearchProvider {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async search(query: WebEvidenceQuery): Promise<WebEvidenceResult> {
+  async search(
+    query: WebEvidenceQuery,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<WebEvidenceResult> {
     const retrievedAt = this.now().toISOString();
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const onParentAbort = () => {
+      controller.abort();
+    };
+    if (options.signal?.aborted) {
+      throw new SearchProviderTimeoutError();
+    }
+    options.signal?.addEventListener("abort", onParentAbort, { once: true });
 
     try {
       const timeout = new Promise<never>((_, reject) => {
@@ -152,6 +162,7 @@ export class TavilySearchProvider implements SearchProvider {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
+      options.signal?.removeEventListener("abort", onParentAbort);
     }
   }
 }

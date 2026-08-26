@@ -17,6 +17,7 @@ import {
   parseSpecialistOrchestrationRun,
   parseSpecialistResult,
   parseSpecialistTask,
+  specialistCallTrace,
 } from "@grc/contracts";
 
 import {
@@ -50,6 +51,7 @@ export type OrchestrateSpecialistsInput = {
   findings: readonly SpecialistPreliminaryFinding[];
   retrievedEvidence?: readonly SpecialistRetrievedEvidence[];
   webEvidence?: readonly SpecialistWebEvidenceItem[];
+  signal?: AbortSignal;
 };
 
 export type SpecialistOrchestratorOptions = {
@@ -140,6 +142,7 @@ function syntheticResult(
       provider: identity.provider,
       model: identity.model,
       elapsedMs,
+      ...specialistCallTrace(null),
     },
     warnings: [warning],
   });
@@ -149,12 +152,14 @@ async function runOne(
   specialist: Specialist,
   task: SpecialistTask,
   nowMs: () => number,
+  parent?: AbortSignal,
 ): Promise<SpecialistResult> {
   const started = nowMs();
   try {
     const raw = await withDeadline(
       (signal) => specialist.run(task, { signal }),
       task.constraints.deadlineMs,
+      parent,
     );
     const parsed = parseSpecialistResult(raw);
     return {
@@ -227,7 +232,7 @@ export function createSpecialistOrchestrator(
               syntheticResult(task, "failed", 0, `${task.specialist} is not registered`),
             );
           }
-          return runOne(specialist, task, nowMs);
+          return runOne(specialist, task, nowMs, input.signal);
         }),
       );
       for (const result of results) {
@@ -289,6 +294,7 @@ export function createSpecialistRuntime(
         findings: input.findings,
         retrievedEvidence: input.retrievedEvidence,
         webEvidence: webEvidenceItemsFromRun(input.webEvidence),
+        signal: input.signal,
       });
     },
   };

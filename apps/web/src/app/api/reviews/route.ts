@@ -18,7 +18,7 @@ import {
   LlmCandidateCache,
 } from "@grc/providers";
 import type { ReviewModel } from "@grc/providers";
-import { createReview } from "@grc/review-core";
+import { PRODUCT_REVIEW_DEADLINE_MS, createReview } from "@grc/review-core";
 import { ReviewStore, getReviewDatabase } from "@grc/review-store";
 import { createWebEvidenceCollectorFromEnv } from "@grc/web-evidence";
 import { getReviewStore } from "@/lib/server/store-singleton";
@@ -94,6 +94,8 @@ export function createReviewPostHandler(
             : null,
         webEvidenceCollector: options.webEvidenceCollector ?? null,
         specialistRuntime: options.specialistRuntime ?? null,
+        deadlineMs: PRODUCT_REVIEW_DEADLINE_MS,
+        signal: request.signal,
       });
       store.insertCreatedReview(result, {
         title: result.article.title,

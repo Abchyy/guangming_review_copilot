@@ -19,6 +19,8 @@ export type ReviewPromptContext = {
   promptMode?: ReviewPromptMode;
   retrievedSources?: RetrievedPromptSource[];
   ruleHits?: RulePromptHit[];
+  signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 export type ProviderCallUsage = {

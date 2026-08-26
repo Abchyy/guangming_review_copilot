@@ -1,6 +1,30 @@
 # 真实 E2E Quality Gate（开发报告）
 
-本报告记录一次**真实** DeepSeek + Tavily + specialist 审校 smoke。不是 official holdout，不是 locked 分数，不改 Product Freeze、评估门槛或默认开关。
+本报告记录公开 Demo 稿的真实 DeepSeek + Tavily + specialist 审校。不是 official holdout，不是 locked 分数，不改 Product Freeze、评估门槛或默认开关。
+
+## 第二轮：55s 产品 deadline（`next start`）
+
+同一 Demo，**只跑一次**，冷库（无 candidate cache）。产品路径 `PRODUCT_REVIEW_DEADLINE_MS=55_000`，不提高 `maxDuration=60`。
+
+| 项 | 观察值 |
+| --- | --- |
+| HTTP | `POST /api/reviews` **200** |
+| 墙钟 | **55.132s**（目标 ≤55s，超出 132ms 为 abort 收尾；**未再烧 API**） |
+| `pipeline.elapsed_ms` | **55030** |
+| `review_id` | `fe8413df-4fc7-456c-9370-6334492ced3e` |
+| Findings | 7 条规则结果；`dropped_count=0` |
+| Fallback | **`rules_only`**（`DeepSeek provider unavailable`） |
+| 主审校 attempts | 1，`fatal_failure`，`received_provider_response=false` |
+| Usage / 成本 | usage **incomplete / unobserved**；成本 **indeterminate**（中途 abort） |
+| 应用缓存 | enabled，**miss** |
+| Web Evidence | 2 条计划查询均 `unverified` / `timeout`（deadline 后未再打 Tavily） |
+| Specialist | 派发 `fact_check` 1/2；`timed_out`，`trace_status=unobserved`，`elapsedMs=0`，`unobserved_usage_attempts=1` |
+
+结论：总预算在 60s 内安全降级；剩余外部调用被取消；失败 specialist 明确标为 unobserved。未达到严格 ≤55.000s，按要求停止，不重复调用。
+
+---
+
+## 第一轮：无整体 deadline（对照）
 
 - 基线 Git SHA：`f583e4e6ad123b80b77aafa46cdc3618cf7a6be8`
 - 稿件：公开 Demo `data/fixtures/demo-article.json`（1 篇）
@@ -67,9 +91,10 @@ Demo 稿预埋问题均被找出，且 span 与原文切片一致：
 - Tavily 请求体只有短 query，不是全文；`include_raw_content=false`。
 - 原始响应保存在 gitignored `.data/e2e-quality-gate/`，不入库。
 
-## 代码改动（最小 trace）
+## 代码改动
 
-现有 specialist provenance 只有请求模型与 `elapsedMs`，成功路径无法复核实际模型与 token。仅在 `ModelSpecialist` 成功返回时抄写 `consumeLastProvenance()` 的 `observed_response_model` / `attempt_count` / `aggregated_usage`。本轮 specialist 失败，这些字段未出现，符合预期。
+- 产品路径整体 deadline 55s：超时 abort 主模型 / Tavily / specialist，返回 `rules_only` 与「未能外部核验」。不修改 official `DEEPSEEK_RETRY_POLICY`，不提高 `maxDuration`。
+- specialist 成功 / 失败 / 超时都写入 `attempts`、observed model、usage；无法观察时 `trace_status=unobserved`。
 
 未改 Product Freeze、评估门槛、official holdout、默认开关或技术栈。
 

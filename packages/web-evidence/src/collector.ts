@@ -67,7 +67,11 @@ export function createWebEvidenceCollector(
       });
       const results: WebEvidenceResult[] = [];
       for (const query of queries) {
-        results.push(await searchSafely(provider, query, now));
+        if (input.signal?.aborted) {
+          results.push(unverifiedResult(provider, query, "timeout", now));
+          continue;
+        }
+        results.push(await searchSafely(provider, query, now, input.signal));
       }
       return parseWebEvidenceRun({
         enabled: true,
@@ -82,9 +86,13 @@ async function searchSafely(
   provider: SearchProvider,
   query: WebEvidenceQuery,
   now: () => Date,
+  signal?: AbortSignal,
 ): Promise<WebEvidenceResult> {
+  if (signal?.aborted) {
+    return unverifiedResult(provider, query, "timeout", now);
+  }
   try {
-    const raw = await provider.search(query);
+    const raw = await provider.search(query, { signal });
     return sanitizeProviderResult(provider, query, raw, now);
   } catch (error) {
     return unverifiedResult(provider, query, classifyProviderError(error), now);

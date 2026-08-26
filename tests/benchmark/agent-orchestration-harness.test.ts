@@ -16,6 +16,7 @@ import {
   type AgentOrchestrationDevCase,
 } from "@grc/benchmark";
 import type { SpecialistResult, SpecialistTask } from "@grc/contracts";
+import { unobservedSpecialistCallFields } from "@grc/contracts";
 import {
   createFakeSpecialists,
   createSpecialistRuntime,
@@ -89,6 +90,7 @@ function successResult(
       provider: "fixture",
       model: "fake-specialist",
       elapsedMs: 12,
+      ...unobservedSpecialistCallFields(),
     },
     warnings: [],
   };
@@ -291,6 +293,7 @@ describe("agent orchestration development harness", () => {
                   provider: "fixture",
                   model: "fake-specialist",
                   elapsedMs: 80,
+                  ...unobservedSpecialistCallFields(),
                 },
                 warnings: ["timed out"],
               },
@@ -324,6 +327,7 @@ describe("agent orchestration development harness", () => {
                   provider: "fixture",
                   model: "fake-specialist",
                   elapsedMs: 9,
+                  ...unobservedSpecialistCallFields(),
                 },
                 warnings: ["provider failed"],
               },

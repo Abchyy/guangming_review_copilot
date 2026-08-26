@@ -221,6 +221,27 @@ describe("MA-0 specialist contracts", () => {
     expect(parsed.provenance.aggregated_usage?.input_tokens).toBe(120);
   });
 
+  test("defaults missing specialist call traces to unobserved", () => {
+    const parsed = specialistResultSchema.parse({
+      taskId: "news_edit:1",
+      candidates: [],
+      provenance: {
+        taskId: "news_edit:1",
+        specialist: "news_edit",
+        invoked: true,
+        status: "failed",
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        elapsedMs: 12,
+      },
+      warnings: ["专项核验失败，待人工核实"],
+    });
+    expect(parsed.provenance.trace_status).toBe("unobserved");
+    expect(parsed.provenance.observed_response_model).toBeNull();
+    expect(parsed.provenance.attempts).toEqual([]);
+    expect(parsed.provenance.aggregated_usage.input_tokens_completeness).toBe("not_observed");
+  });
+
   test("accepts fact_check and news_edit fragment tasks without the full article", () => {
     expect(MODEL_SPECIALIST_IDS).toEqual(["fact_check", "news_edit"]);
     expect(SPECIALIST_MAX_PER_ARTICLE).toBe(2);

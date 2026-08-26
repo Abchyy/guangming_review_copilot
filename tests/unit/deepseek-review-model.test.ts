@@ -250,6 +250,45 @@ describe("DeepSeek review model", () => {
     expect(DEEPSEEK_RETRY_POLICY.max_tokens).toBe(8192);
   });
 
+  test("an aborted review does not start a second official retry", async () => {
+    const controller = new AbortController();
+    const create = vi.fn((_body: unknown, options?: { signal?: AbortSignal }) => {
+      return new Promise((_resolve, reject) => {
+        const signal = options?.signal;
+        if (signal?.aborted) {
+          reject(new DOMException("Aborted", "AbortError"));
+          return;
+        }
+        signal?.addEventListener(
+          "abort",
+          () => {
+            reject(new DOMException("Aborted", "AbortError"));
+          },
+          { once: true },
+        );
+      });
+    });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+    const started = Date.now();
+    queueMicrotask(() => controller.abort());
+    await expect(
+      model.review(
+        { title: "标题", body: "座谈谈会", version: 1 },
+        { signal: controller.signal, timeoutMs: 60_000 },
+      ),
+    ).rejects.toBeInstanceOf(ReviewProviderError);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(DEEPSEEK_RETRY_POLICY).toEqual({
+      max_attempts: 2,
+      timeout_ms: 60_000,
+      max_tokens: 8192,
+    });
+  });
+
   test("specialist request timeout aborts the in-flight provider call instead of leaving it running", async () => {
     let aborted = false;
     const create = vi.fn(

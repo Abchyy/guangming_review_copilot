@@ -57,7 +57,51 @@ export type CreateReviewOptions = {
   webEvidenceCollector?: WebEvidenceCollector | null;
   /** Optional specialist runtime. Default off; review-core never imports the orchestration package. */
   specialistRuntime?: SpecialistRuntime | null;
+  /** Product-path wall clock. Official holdout must omit this. */
+  deadlineMs?: number;
+  signal?: AbortSignal;
 };
+
+/** Product reviews must finish or degrade under the Next.js route cap. */
+export const PRODUCT_REVIEW_DEADLINE_MS = 55_000;
+export const PRODUCT_REVIEW_MAX_ELAPSED_MS = 60_000;
+
+function remainingDeadlineMs(startedAt: number, deadlineMs: number | undefined): number | undefined {
+  if (deadlineMs == null) {
+    return undefined;
+  }
+  return Math.max(0, deadlineMs - (Date.now() - startedAt));
+}
+
+function linkReviewAbort(options: { deadlineMs?: number; signal?: AbortSignal }): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const onParentAbort = () => {
+    if (!controller.signal.aborted) {
+      controller.abort();
+    }
+  };
+  if (options.signal?.aborted) {
+    controller.abort();
+  } else {
+    options.signal?.addEventListener("abort", onParentAbort, { once: true });
+  }
+  const timer =
+    options.deadlineMs != null
+      ? setTimeout(onParentAbort, Math.max(0, options.deadlineMs))
+      : undefined;
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      options.signal?.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
 
 
 export async function createReview(
@@ -67,6 +111,24 @@ export async function createReview(
 ): Promise<CreateReviewResponse> {
   const startedAt = Date.now();
   validateRequest(input);
+  const abort = linkReviewAbort({
+    deadlineMs: options.deadlineMs,
+    signal: options.signal,
+  });
+  try {
+    return await createReviewWithSignal(input, model, options, startedAt, abort.signal);
+  } finally {
+    abort.cleanup();
+  }
+}
+
+async function createReviewWithSignal(
+  input: CreateReviewRequest,
+  model: ReviewModel,
+  options: CreateReviewOptions,
+  startedAt: number,
+  signal: AbortSignal,
+): Promise<CreateReviewResponse> {
 
   const canonical = canonicalizeArticle(input.title, input.body);
   if (canonical.title.length === 0 || canonical.body.length === 0) {
@@ -116,6 +178,10 @@ export async function createReview(
 
   if (!cacheHit) {
     try {
+      const modelTimeoutMs = remainingDeadlineMs(startedAt, options.deadlineMs);
+      if (signal.aborted || modelTimeoutMs === 0) {
+        throw new ReviewProviderError("Review deadline exceeded");
+      }
       rawCandidates = await model.review(article, {
         promptMode,
         ruleHits: ruleHits.map((hit) => ({
@@ -129,6 +195,9 @@ export async function createReview(
           category: item.category,
           excerpt: item.excerpt,
         })),
+        ...(options.deadlineMs != null || options.signal
+          ? { signal, timeoutMs: modelTimeoutMs }
+          : {}),
       });
     } catch (error) {
       const providerError =
@@ -242,6 +311,7 @@ export async function createReview(
     options.webEvidenceCollector,
     article,
     findings,
+    signal,
   );
 
   const specialistRun = await runSpecialists(
@@ -261,6 +331,7 @@ export async function createReview(
       trigger: item.trigger,
     })),
     webEvidence,
+    signal,
   );
   const finalized = specialistRun
     ? applySpecialistJudgments(findings, specialistRun)
@@ -292,12 +363,13 @@ async function collectWebEvidence(
   collector: WebEvidenceCollector | null | undefined,
   article: CanonicalArticle,
   findings: Finding[],
+  signal?: AbortSignal,
 ): Promise<WebEvidenceRun | undefined> {
   if (!collector) {
     return undefined;
   }
   try {
-    return parseWebEvidenceRun(await collector.collect({ article, findings }));
+    return parseWebEvidenceRun(await collector.collect({ article, findings, signal }));
   } catch {
     return parseWebEvidenceRun({
       enabled: true,
@@ -328,6 +400,7 @@ async function runSpecialists(
   findings: Finding[],
   retrieved: readonly SpecialistRetrievedEvidence[],
   webEvidence: WebEvidenceRun | undefined,
+  signal?: AbortSignal,
 ): Promise<SpecialistOrchestrationRun | undefined> {
   if (!runtime) {
     return undefined;
@@ -339,6 +412,7 @@ async function runSpecialists(
         findings,
         retrievedEvidence: retrieved,
         webEvidence,
+        signal,
       }),
     );
   } catch (error) {

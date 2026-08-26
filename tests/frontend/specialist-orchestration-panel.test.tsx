@@ -20,7 +20,7 @@ import type {
   SpecialistOrchestrationRun,
   SpecialistResult,
 } from "@grc/contracts";
-import { specialistOrchestrationRunSchema } from "@grc/contracts";
+import { specialistOrchestrationRunSchema, unobservedSpecialistCallFields } from "@grc/contracts";
 
 const PERSON_QUOTE = "市教育局局长王海涛";
 const CITATION_QUOTE = "王强在总结时强调开学工作";
@@ -108,6 +108,7 @@ function result(input: {
       provider: "fixture",
       model: "fake-specialist",
       elapsedMs: input.elapsedMs ?? 12,
+      ...unobservedSpecialistCallFields(),
     },
     warnings: input.warnings ?? [],
   };
