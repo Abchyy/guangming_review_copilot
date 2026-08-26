@@ -18,7 +18,7 @@ import { createReview } from "@grc/review-core";
 | rules-engine | `packages/rules-engine` | 规则加载与命中 | `runRules`、`getRuleVersion` | HTTP、最终 Finding 决策 |
 | retrieval | `packages/retrieval` | 语料检索 | `Retriever`、`retrieveCorpus`、`RetrievedEvidence` | 直接决定 Finding、GraphRAG、外部向量库 |
 | web-evidence | `packages/web-evidence` | 轻量联网核验：Query Policy、SearchProvider、离线 fake 与默认关闭的 Tavily live adapter | `SearchProvider`、`FakeSearchProvider`、`TavilySearchProvider`、`createWebEvidenceCollector`、`createWebEvidenceCollectorFromEnv`、`planWebEvidenceQueries` | RAG、向量库、前端、holdout、把 fake 标成 live |
-| agent-orchestration | `packages/agent-orchestration` | 默认关闭的多 Agent 编排：确定性路由、并行预算、超时、部分失败/分歧降级为待人工核实、provenance、deterministic fake specialists | `createSpecialistOrchestrator`、`createFakeSpecialists`、`FakeFactCheckSpecialist`、`FakeNewsEditSpecialist` | 真实 DeepSeek 调用、接入 `createReview`、UI、RAG、联网搜索、把规则引擎当成模型 Agent、简单多数投票 |
+| agent-orchestration | `packages/agent-orchestration` | 默认关闭的多 Agent 编排：确定性路由、并行预算、超时、部分失败/分歧降级为待人工核实、provenance、fake 与 DeepSeek-V4-flash specialists | `createSpecialistOrchestrator`、`createSpecialistRuntime`、`createSpecialistRuntimeFromEnv`、`createFakeSpecialists`、`createModelSpecialists` | UI、RAG、新搜索服务、把规则引擎当成模型 Agent、简单多数投票、把全文发给 specialist |
 | providers | `packages/providers` | 模型 adapter、prompt、cache、fallback 模式 | `ReviewModel`、`FixtureReviewModel`、`getFallbackMode` | 业务规则、排序、DB 写入 |
 | review-store | `packages/review-store` | Accept/Ignore/Verify 状态机 + SQLite | `ReviewStore`、`canTransition`、`openReviewDatabase` | Next、benchmark |
 | web | `apps/web` | UI、Route Handler 组合 | `/api/reviews` | 质量算法、holdout |
@@ -30,15 +30,15 @@ import { createReview } from "@grc/review-core";
 
 - `contracts` → 无业务依赖
 - `rules-engine` / `retrieval` / `providers` / `review-store` / `web-evidence` / `agent-orchestration` → `contracts`
-- `review-core` → `contracts` + rules + retrieval + providers（可选 `WebEvidenceCollector` 接口；不得依赖 `@grc/web-evidence`、`@grc/agent-orchestration` 或具体搜索供应商）
-- `web` → contracts + review-core + providers + review-store + web-evidence（仅 Route Handler；未同时配置 `WEB_EVIDENCE_ENABLED=true` 与 `TAVILY_API_KEY` 时不查询；不得导入 agent-orchestration）
+- `review-core` → `contracts` + rules + retrieval + providers（可选 `WebEvidenceCollector` / `SpecialistRuntime` 接口；不得依赖 `@grc/web-evidence`、`@grc/agent-orchestration` 或具体搜索供应商）
+- `web` → contracts + review-core + providers + review-store + web-evidence + agent-orchestration（仅 Route Handler；未同时配置 `WEB_EVIDENCE_ENABLED=true` 与 `TAVILY_API_KEY` 时不查询；`REVIEW_SPECIALISTS_ENABLED` 不为 `1` 时不调用 specialist；前端不得导入 agent-orchestration）
 - `benchmark` 可消费公开产品接口
 - 产品运行时 **不得** 依赖 `benchmark` 或 `holdout-protocol`
 - `test-kit` 只能是根目录 `devDependency`
 
 ## Pipeline 组合
 
-`createReview`：canonicalize → `runRules` → `retrieveCorpus` → provider（失败且 copilot 且有规则命中则 `rules_only` fallback）→ locate span → fuse → rank → 可选 Web Evidence。`specialists_enabled` 恒为 `false`，不调用 `@grc/agent-orchestration`。未注入 `webEvidenceCollector` 时不查询、不改变 Finding、不写 `pipeline.web_evidence`。
+`createReview`：canonicalize → `runRules` → `retrieveCorpus` → provider（失败且 copilot 且有规则命中则 `rules_only` fallback）→ locate span → fuse → rank → 可选 Web Evidence → 可选 Specialist Runtime。未注入 `webEvidenceCollector` 时不查询、不改变 Finding、不写 `pipeline.web_evidence`。未注入 `specialistRuntime` 时 `specialists_enabled` 为 `false`，不写 `pipeline.specialist_orchestration`，不改变 Finding。产品入口仅在 `REVIEW_SPECIALISTS_ENABLED=1` 且已配置 `DEEPSEEK_API_KEY` 时注入 DeepSeek-V4-flash `fact_check` / `news_edit`；每篇最多 2 次并行调用；只传相关片段、findings 和已有本地/联网证据，不传全文。`basic_text` 不派发模型。超时、失败或分歧时保留主审校结果并标为待人工核实。
 
 ## RAG 边界
 

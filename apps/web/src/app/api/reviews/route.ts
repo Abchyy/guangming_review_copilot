@@ -3,9 +3,19 @@ import {
   ReviewProviderError,
   ReviewRequestError,
   createReviewRequestSchema,
+  type SpecialistRuntime,
   type WebEvidenceCollector,
 } from "@grc/contracts";
-import { createReviewModelFromEnv, LlmCandidateCache } from "@grc/providers";
+import {
+  createSpecialistRuntimeFromEnv,
+  SPECIALIST_TARGET_MODEL,
+} from "@grc/agent-orchestration";
+import {
+  createReviewModelFromEnv,
+  DeepSeekReviewModel,
+  getDeepSeekApiKey,
+  LlmCandidateCache,
+} from "@grc/providers";
 import type { ReviewModel } from "@grc/providers";
 import { createReview } from "@grc/review-core";
 import { ReviewStore, getReviewDatabase } from "@grc/review-store";
@@ -32,7 +42,22 @@ function errorResponse(error: unknown): Response {
 
 export type ReviewPostHandlerOptions = {
   webEvidenceCollector?: WebEvidenceCollector | null;
+  specialistRuntime?: SpecialistRuntime | null;
 };
+
+export function createProductSpecialistRuntime(): SpecialistRuntime | null {
+  const apiKey = getDeepSeekApiKey();
+  if (!apiKey) {
+    return null;
+  }
+  return createSpecialistRuntimeFromEnv(process.env, {
+    clientFactory: () =>
+      new DeepSeekReviewModel({
+        apiKey,
+        model: SPECIALIST_TARGET_MODEL,
+      }),
+  });
+}
 
 export function createReviewPostHandler(
   model: ReviewModel,
@@ -66,6 +91,7 @@ export function createReviewPostHandler(
             ? new LlmCandidateCache(getReviewDatabase())
             : null,
         webEvidenceCollector: options.webEvidenceCollector ?? null,
+        specialistRuntime: options.specialistRuntime ?? null,
       });
       store.insertCreatedReview(result, {
         title: result.article.title,
@@ -81,5 +107,6 @@ export function createReviewPostHandler(
 export async function POST(request: Request): Promise<Response> {
   return createReviewPostHandler(createReviewModelFromEnv(), getReviewStore(), {
     webEvidenceCollector: createWebEvidenceCollectorFromEnv(),
+    specialistRuntime: createProductSpecialistRuntime(),
   })(request);
 }

@@ -1,11 +1,14 @@
 export type { EnvLike } from "./config";
 export type { FakeSpecialistBehavior, FakeSpecialistOptions } from "./fake-specialists";
+export type { SpecialistCompletionClient } from "./model-specialists";
 export type {
   OrchestrateSpecialistsInput,
   SpecialistOrchestrator,
   SpecialistOrchestratorOptions,
+  SpecialistRuntimeOptions,
 } from "./orchestrator";
 export {
+  DEFAULT_MODEL_SPECIALIST_DEADLINE_MS,
   DEFAULT_SPECIALIST_DEADLINE_MS,
   DEFAULT_SPECIALIST_MAX_CANDIDATES,
   FAKE_SPECIALIST_MODEL,
@@ -32,10 +35,23 @@ export {
   extractFragments,
   fragmentToSpan,
   specialistTaskContainsFullArticle,
+  webEvidenceForFragments,
+  webEvidenceItemsFromRun,
 } from "./fragments";
+export {
+  buildSpecialistUserPrompt,
+  candidateQuoteFromTaskFragments,
+  createModelSpecialist,
+  createModelSpecialists,
+  matchingTaskFragment,
+  ModelSpecialist,
+  sanitizeSpecialistCandidates,
+} from "./model-specialists";
 export {
   createSpecialistOrchestrator,
   createSpecialistOrchestratorFromEnv,
+  createSpecialistRuntime,
+  createSpecialistRuntimeFromEnv,
 } from "./orchestrator";
 export {
   FACT_CHECK_FINDING_TYPES,

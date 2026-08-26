@@ -7,7 +7,10 @@ import type {
   SpecialistPreliminaryFinding,
   SpecialistResult,
   SpecialistRetrievedEvidence,
+  SpecialistRuntime,
+  SpecialistRuntimeInput,
   SpecialistTask,
+  SpecialistWebEvidenceItem,
 } from "@grc/contracts";
 import {
   SPECIALIST_MAX_PER_ARTICLE,
@@ -17,6 +20,7 @@ import {
 } from "@grc/contracts";
 
 import {
+  DEFAULT_MODEL_SPECIALIST_DEADLINE_MS,
   DEFAULT_SPECIALIST_DEADLINE_MS,
   DEFAULT_SPECIALIST_MAX_CANDIDATES,
   FAKE_SPECIALIST_MODEL,
@@ -29,7 +33,14 @@ import {
 import { judgeSpecialistResults } from "./conflict";
 import { SpecialistExecutionError, SpecialistTimeoutError } from "./errors";
 import { createFakeSpecialists } from "./fake-specialists";
-import { evidenceForFragments, extractFragments, fragmentToSpan } from "./fragments";
+import {
+  evidenceForFragments,
+  extractFragments,
+  fragmentToSpan,
+  webEvidenceForFragments,
+  webEvidenceItemsFromRun,
+} from "./fragments";
+import { createModelSpecialists, type SpecialistCompletionClient } from "./model-specialists";
 import { SPECIALIST_ROLE_FINDING_TYPES, isModelSpecialistId } from "./roles";
 import { selectSpecialists } from "./router";
 import { withDeadline } from "./timeout";
@@ -38,6 +49,7 @@ export type OrchestrateSpecialistsInput = {
   article: CanonicalArticle;
   findings: readonly SpecialistPreliminaryFinding[];
   retrievedEvidence?: readonly SpecialistRetrievedEvidence[];
+  webEvidence?: readonly SpecialistWebEvidenceItem[];
 };
 
 export type SpecialistOrchestratorOptions = {
@@ -62,11 +74,22 @@ function findingsForSpecialist(
   return findings.filter((item) => allowed.has(item.type));
 }
 
+function identityOf(specialist: Specialist | undefined): {
+  provider: SpecialistResult["provenance"]["provider"];
+  model: SpecialistResult["provenance"]["model"];
+} {
+  return {
+    provider: specialist?.provider ?? FAKE_SPECIALIST_PROVIDER,
+    model: specialist?.model ?? FAKE_SPECIALIST_MODEL,
+  };
+}
+
 function buildTask(input: {
   specialist: SpecialistId;
   article: CanonicalArticle;
   findings: readonly SpecialistPreliminaryFinding[];
   retrievedEvidence: readonly SpecialistRetrievedEvidence[];
+  webEvidence: readonly SpecialistWebEvidenceItem[];
   deadlineMs: number;
   maxCandidates: number;
 }): SpecialistTask {
@@ -77,6 +100,11 @@ function buildTask(input: {
     relevantFindings,
     input.retrievedEvidence,
   );
+  const webEvidence = webEvidenceForFragments(
+    fragments,
+    relevantFindings,
+    input.webEvidence,
+  );
   return parseSpecialistTask({
     taskId: `${input.specialist}:1`,
     specialist: input.specialist,
@@ -84,6 +112,7 @@ function buildTask(input: {
     preliminaryFindings: relevantFindings,
     candidateSpans: fragments.map(fragmentToSpan),
     retrievedEvidence,
+    webEvidence,
     constraints: {
       maxCandidates: input.maxCandidates,
       deadlineMs: input.deadlineMs,
@@ -97,7 +126,9 @@ function syntheticResult(
   status: "failed" | "timed_out",
   elapsedMs: number,
   warning: string,
+  specialist?: Specialist,
 ): SpecialistResult {
+  const identity = identityOf(specialist);
   return parseSpecialistResult({
     taskId: task.taskId,
     candidates: [],
@@ -106,8 +137,8 @@ function syntheticResult(
       specialist: task.specialist,
       invoked: true,
       status,
-      provider: FAKE_SPECIALIST_PROVIDER,
-      model: FAKE_SPECIALIST_MODEL,
+      provider: identity.provider,
+      model: identity.model,
       elapsedMs,
     },
     warnings: [warning],
@@ -132,17 +163,19 @@ async function runOne(
         taskId: task.taskId,
         specialist: task.specialist,
         invoked: true,
+        provider: parsed.provenance.provider ?? identityOf(specialist).provider,
+        model: parsed.provenance.model ?? identityOf(specialist).model,
         elapsedMs: Math.max(0, nowMs() - started),
       },
     };
   } catch (error) {
     const elapsedMs = Math.max(0, nowMs() - started);
     if (error instanceof SpecialistTimeoutError) {
-      return syntheticResult(task, "timed_out", elapsedMs, error.message);
+      return syntheticResult(task, "timed_out", elapsedMs, error.message, specialist);
     }
     const message =
       error instanceof Error ? error.message : "specialist failed without an error message";
-    return syntheticResult(task, "failed", elapsedMs, message);
+    return syntheticResult(task, "failed", elapsedMs, message, specialist);
   }
 }
 
@@ -165,6 +198,7 @@ export function createSpecialistOrchestrator(
   return {
     async orchestrate(input: OrchestrateSpecialistsInput): Promise<SpecialistOrchestrationRun> {
       const evidence = input.retrievedEvidence ?? [];
+      const webEvidence = input.webEvidence ?? [];
       const selected = selectSpecialists({
         findings: input.findings,
         available: [...byId.keys()],
@@ -176,6 +210,7 @@ export function createSpecialistOrchestrator(
           article: input.article,
           findings: input.findings,
           retrievedEvidence: evidence,
+          webEvidence,
           deadlineMs,
           maxCandidates,
         }),
@@ -223,4 +258,47 @@ export function createSpecialistOrchestratorFromEnv(
     return null;
   }
   return createSpecialistOrchestrator(createFakeSpecialists(), options);
+}
+
+export type SpecialistRuntimeOptions = SpecialistOrchestratorOptions & {
+  clientFactory?: () => SpecialistCompletionClient;
+};
+
+function usesDeepSeekClient(specialists: readonly Specialist[]): boolean {
+  return specialists.some((item) => item.provider === "deepseek");
+}
+
+export function createSpecialistRuntime(
+  specialists: readonly Specialist[],
+  options: SpecialistOrchestratorOptions = {},
+): SpecialistRuntime {
+  const deadlineMs =
+    options.deadlineMs ??
+    (usesDeepSeekClient(specialists)
+      ? DEFAULT_MODEL_SPECIALIST_DEADLINE_MS
+      : DEFAULT_SPECIALIST_DEADLINE_MS);
+  const orchestrator = createSpecialistOrchestrator(specialists, {
+    ...options,
+    deadlineMs,
+  });
+  return {
+    orchestrate(input: SpecialistRuntimeInput) {
+      return orchestrator.orchestrate({
+        article: input.article,
+        findings: input.findings,
+        retrievedEvidence: input.retrievedEvidence,
+        webEvidence: webEvidenceItemsFromRun(input.webEvidence),
+      });
+    },
+  };
+}
+
+export function createSpecialistRuntimeFromEnv(
+  env: EnvLike = process.env,
+  options: SpecialistRuntimeOptions = {},
+): SpecialistRuntime | null {
+  if (!isSpecialistOrchestrationEnabled(env) || !options.clientFactory) {
+    return null;
+  }
+  return createSpecialistRuntime(createModelSpecialists(options.clientFactory), options);
 }

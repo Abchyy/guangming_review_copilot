@@ -9,7 +9,11 @@ import {
   createReviewResponseSchema,
   type ReviewCandidate,
 } from "@grc/contracts";
-import { createReviewPostHandler } from "@/app/api/reviews/route";
+import {
+  createProductSpecialistRuntime,
+  createReviewPostHandler,
+} from "@/app/api/reviews/route";
+import { createFakeSpecialists, createSpecialistRuntime } from "@grc/agent-orchestration";
 import { createFindingPatchHandler } from "@/app/api/reviews/[reviewId]/findings/[findingId]/route";
 import { openReviewDatabase } from "@grc/review-store";
 import { FixtureReviewModel } from "@grc/providers";
@@ -53,6 +57,8 @@ describe("POST /api/reviews", () => {
     const payload = createReviewResponseSchema.parse(await response.json());
     expect(payload.findings.length).toBeGreaterThan(0);
     expect(payload.pipeline.web_evidence).toBeUndefined();
+    expect(payload.pipeline.specialists_enabled).toBe(false);
+    expect(payload.pipeline.specialist_orchestration).toBeUndefined();
     expect(payload.findings.every((finding) => finding.status === "pending")).toBe(true);
     expect(store.getReview(payload.review_id).review_id).toBe(payload.review_id);
     for (const finding of payload.findings) {
@@ -64,6 +70,25 @@ describe("POST /api/reviews", () => {
         text.slice(finding.source_span.start_offset, finding.source_span.end_offset),
       ).toBe(finding.source_span.quoted_text);
     }
+  });
+
+  test("opt-in specialist runtime uses fixtures and stays off without the flag", async () => {
+    expect(createProductSpecialistRuntime()).toBeNull();
+    process.env.REVIEW_SPECIALISTS_ENABLED = "1";
+    expect(createProductSpecialistRuntime()).toBeNull();
+    delete process.env.REVIEW_SPECIALISTS_ENABLED;
+
+    const store = new ReviewStore(openReviewDatabase(":memory:"));
+    const handler = createReviewPostHandler(new FixtureReviewModel(), store, {
+      specialistRuntime: createSpecialistRuntime(createFakeSpecialists(), { nowMs: () => 0 }),
+    });
+    const response = await handler(jsonRequest("http://localhost/api/reviews", demoArticle));
+    expect(response.status).toBe(200);
+    const payload = createReviewResponseSchema.parse(await response.json());
+    expect(payload.pipeline.specialists_enabled).toBe(true);
+    expect(payload.pipeline.specialist_orchestration?.enabled).toBe(true);
+    expect(payload.pipeline.specialist_orchestration?.budget.used).toBeLessThanOrEqual(2);
+    expect(payload.findings.length).toBeGreaterThan(0);
   });
 
   test("missing title or body is rejected", async () => {

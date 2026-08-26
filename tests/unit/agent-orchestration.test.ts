@@ -33,13 +33,16 @@ import {
   SPECIALIST_TARGET_MODEL,
   SPECIALIST_TIMEOUT_MESSAGE,
   createFakeSpecialists,
+  createModelSpecialists,
   createSpecialistOrchestrator,
   createSpecialistOrchestratorFromEnv,
+  createSpecialistRuntimeFromEnv,
   extractFragments,
   isSpecialistOrchestrationEnabled,
   selectSpecialists,
   specialistIdsForFindings,
   specialistTaskContainsFullArticle,
+  webEvidenceForFragments,
 } from "@grc/agent-orchestration";
 
 const article: CanonicalArticle = {
@@ -130,11 +133,13 @@ function candidateOn(
 }
 
 describe("agent orchestration foundation", () => {
-  test("stays off by default and is not wired into createReview", async () => {
+  test("stays off by default and is not wired into createReview without a runtime", async () => {
     expect(isSpecialistOrchestrationEnabled()).toBe(false);
     expect(createSpecialistOrchestratorFromEnv()).toBeNull();
+    expect(createSpecialistRuntimeFromEnv()).toBeNull();
 
     process.env.REVIEW_SPECIALISTS_ENABLED = "1";
+    expect(createSpecialistRuntimeFromEnv()).toBeNull();
     const model = new FixtureReviewModel([]);
     const result = await createReview(
       { title: article.title, body: article.body },
@@ -411,6 +416,66 @@ describe("agent orchestration foundation", () => {
     );
   });
 
+  test("web evidence is filtered to the current specialist fragments, not broadcast", async () => {
+    const seen: SpecialistTask[] = [];
+    const fact = new FakeFactCheckSpecialist();
+    const news = new FakeNewsEditSpecialist();
+    const recording: Specialist[] = [
+      {
+        id: "fact_check",
+        run(task) {
+          seen.push(task);
+          return fact.run(task);
+        },
+      },
+      {
+        id: "news_edit",
+        run(task) {
+          seen.push(task);
+          return news.run(task);
+        },
+      },
+    ];
+    const personWeb = {
+      source_name: "教育部",
+      url: "https://example.invalid/edu",
+      excerpt: "市教育局局长王海涛",
+      title: "市教育局局长王海涛",
+      source_tier: "official" as const,
+      published_or_version_date: "2026-01-01",
+    };
+    const statsWeb = {
+      source_name: "统计公报",
+      url: "https://example.invalid/stats",
+      excerpt: "义务教育阶段在校生共128万人",
+      title: "在校生统计",
+      source_tier: "official" as const,
+      published_or_version_date: "2026-01-01",
+    };
+    const personFragments = extractFragments(article, [personFinding]);
+    expect(webEvidenceForFragments(personFragments, [personFinding], [personWeb, statsWeb])).toEqual([
+      personWeb,
+    ]);
+
+    await createSpecialistOrchestrator(recording, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding, typoFinding, consistencyFinding],
+      retrievedEvidence,
+      webEvidence: [personWeb, statsWeb],
+    });
+
+    const factTask = seen.find((task) => task.specialist === "fact_check");
+    const newsTask = seen.find((task) => task.specialist === "news_edit");
+    expect(factTask?.webEvidence.map((item) => item.url)).toEqual(["https://example.invalid/edu"]);
+    expect(newsTask?.webEvidence.map((item) => item.url)).toEqual(["https://example.invalid/stats"]);
+    expect(factTask?.webEvidence.some((item) => item.url === "https://example.invalid/stats")).toBe(
+      false,
+    );
+    expect(newsTask?.webEvidence.some((item) => item.url === "https://example.invalid/edu")).toBe(
+      false,
+    );
+  });
+
   test("orchestration run is structured and parseable", async () => {
     const run = await createSpecialistOrchestrator(createFakeSpecialists(), { nowMs: () => 0 }).orchestrate({
       article,
@@ -426,6 +491,304 @@ describe("review-core isolation from specialist orchestration", () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
     const pipeline = readFileSync(join(root, "packages/review-core/src/pipeline.ts"), "utf8");
     expect(pipeline).not.toContain("@grc/agent-orchestration");
-    expect(pipeline).toContain("specialists_enabled: false");
+    expect(pipeline).toContain("specialistRuntime");
+  });
+});
+
+describe("DeepSeek specialist adapter", () => {
+  test("model specialists send fragments and evidence, never the full article", async () => {
+    const calls: Array<{ system: string; user: string }> = [];
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      async completeJson(input) {
+        calls.push(input);
+        return [];
+      },
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding, typoFinding, consistencyFinding],
+      retrievedEvidence,
+    });
+
+    expect(run.dispatched).toEqual(["fact_check", "news_edit"]);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((item) => item.system.includes("不要用多数票") || item.system.includes("新闻编辑专家"))).toBe(
+      true,
+    );
+    expect(JSON.stringify(calls).includes("SECRET_FULL_TEXT_MARKER")).toBe(false);
+    expect(JSON.stringify(calls).includes(article.body)).toBe(false);
+    expect(calls.some((item) => item.user.includes("市教育局局长王海涛"))).toBe(true);
+    expect(calls.some((item) => item.user.includes("source-edu-bureau"))).toBe(true);
+    expect(calls.every((item) => !item.user.includes("type=basic_text"))).toBe(true);
+    expect(run.results.every((item) => item.provenance.provider === "deepseek")).toBe(true);
+    expect(run.results.every((item) => item.provenance.model === "deepseek-v4-flash")).toBe(true);
+  });
+
+  test("drops basic_text and quotes that are not in the current task fragments", async () => {
+    const mixed: ReviewCandidate[] = [
+      candidateOn("座谈谈会", "错别字", "座谈会"),
+      {
+        ...candidateOn("SECRET_FULL_TEXT_MARKER", "编造全文片段", null),
+        type: "person",
+      },
+      {
+        ...candidateOn("市教育局局长王海涛", "职务待核验", null),
+        type: "person",
+      },
+      {
+        ...candidateOn("义务教育阶段在校生共128万人", "文内数字前后矛盾", null),
+        type: "consistency",
+      },
+    ];
+    mixed[0] = { ...mixed[0]!, type: "basic_text", severity: "low" };
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve(mixed),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding, typoFinding, consistencyFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    const news = run.results.find((item) => item.provenance.specialist === "news_edit");
+    expect(fact?.candidates.map((item) => item.type)).toEqual(["person"]);
+    expect(fact?.candidates.map((item) => item.source.exact_quote)).toEqual(["市教育局局长王海涛"]);
+    expect(news?.candidates.map((item) => item.type)).toEqual(["consistency"]);
+    expect(news?.candidates.map((item) => item.source.exact_quote)).toEqual([
+      "义务教育阶段在校生共128万人",
+    ]);
+    expect(fact?.candidates.every((item) => item.type !== "basic_text")).toBe(true);
+    expect(news?.candidates.every((item) => item.type !== "basic_text")).toBe(true);
+    expect(
+      [...(fact?.candidates ?? []), ...(news?.candidates ?? [])].every(
+        (item) => item.source.exact_quote !== "座谈谈会",
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(run.results).includes("SECRET_FULL_TEXT_MARKER")).toBe(false);
+  });
+
+  test("keeps only retrieved_source and source_url that were supplied on the task", async () => {
+    const mixed: ReviewCandidate[] = [
+      {
+        ...candidateOn("市教育局局长王海涛", "职务待核验", null),
+        type: "person",
+        source_id: "invented-id",
+        evidence: [
+          {
+            kind: "retrieved_source",
+            excerpt: "市教育局局长王海涛",
+            citation_validated: false,
+            source_id: "source-edu-bureau",
+            source_url: "https://example.invalid/edu",
+          },
+          {
+            kind: "retrieved_source",
+            excerpt: "forged dossier",
+            citation_validated: false,
+            source_id: "invented-id",
+            source_url: "https://evil.example/fake",
+          },
+          {
+            kind: "ai_judgment",
+            excerpt: "模型判断",
+            citation_validated: false,
+            source_url: "https://evil.example/fake",
+          },
+          {
+            kind: "retrieved_source",
+            excerpt: "市教育局局长王海涛",
+            citation_validated: false,
+            source_url: "https://example.invalid/web-person",
+          },
+        ],
+      },
+    ];
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve(mixed),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+      retrievedEvidence,
+      webEvidence: [
+        {
+          source_name: "教育部",
+          url: "https://example.invalid/web-person",
+          excerpt: "市教育局局长王海涛",
+          title: "市教育局局长王海涛",
+          source_tier: "official",
+          published_or_version_date: "2026-01-01",
+        },
+      ],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    const packed = JSON.stringify(fact?.candidates);
+    expect(fact?.candidates).toHaveLength(1);
+    expect(fact?.candidates[0]?.source_id).toBeUndefined();
+    expect(fact?.candidates[0]?.evidence).toEqual([
+      {
+        kind: "retrieved_source",
+        excerpt: "市教育局局长王海涛",
+        citation_validated: false,
+        source_id: "source-edu-bureau",
+        source_url: "https://example.invalid/edu",
+      },
+      {
+        kind: "ai_judgment",
+        excerpt: "模型判断",
+        citation_validated: false,
+      },
+      {
+        kind: "retrieved_source",
+        excerpt: "市教育局局长王海涛",
+        citation_validated: false,
+        source_url: "https://example.invalid/web-person",
+      },
+    ]);
+    expect(packed.includes("invented-id")).toBe(false);
+    expect(packed.includes("evil.example")).toBe(false);
+  });
+
+  test("drops candidates whose paragraph_index does not match the task fragment", async () => {
+    const wrongParagraph: ReviewCandidate = {
+      ...candidateOn("市教育局局长王海涛", "职务待核验", null),
+      type: "person",
+      source: {
+        ...candidateOn("市教育局局长王海涛", "职务待核验", null).source,
+        paragraph_index: 9,
+      },
+    };
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve([wrongParagraph]),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.candidates).toEqual([]);
+  });
+
+  test("overwrites model-generated context with the matching fragment context", async () => {
+    const forged: ReviewCandidate = {
+      ...candidateOn("市教育局局长王海涛", "职务待核验", null),
+      type: "person",
+      source: {
+        field: "body",
+        exact_quote: "市教育局局长王海涛",
+        paragraph_index: 0,
+        context_before: "FORGED_CONTEXT_BEFORE",
+        context_after: "FORGED_CONTEXT_AFTER",
+      },
+    };
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve([forged]),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const expected = extractFragments(article, [personFinding])[0];
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.candidates).toHaveLength(1);
+    expect(fact?.candidates[0]?.source).toEqual({
+      field: expected?.field,
+      exact_quote: "市教育局局长王海涛",
+      paragraph_index: expected?.paragraph_index,
+      context_before: expected?.context_before,
+      context_after: expected?.context_after,
+    });
+    expect(JSON.stringify(fact?.candidates).includes("FORGED_CONTEXT_BEFORE")).toBe(false);
+    expect(JSON.stringify(fact?.candidates).includes("FORGED_CONTEXT_AFTER")).toBe(false);
+  });
+
+  test("downgrades forged rule evidence to ai_judgment", async () => {
+    const mixed: ReviewCandidate[] = [
+      {
+        ...candidateOn("市教育局局长王海涛", "职务待核验", null),
+        type: "person",
+        rule_id: "invented-rule",
+        evidence: [
+          {
+            kind: "rule",
+            excerpt: "职务表述须核验",
+            citation_validated: true,
+            rule_id: "invented-rule",
+          },
+        ],
+      },
+    ];
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve(mixed),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.candidates[0]?.rule_id).toBeUndefined();
+    expect(fact?.candidates[0]?.evidence).toEqual([
+      {
+        kind: "ai_judgment",
+        excerpt: "职务表述须核验",
+        citation_validated: false,
+      },
+    ]);
+    expect(JSON.stringify(fact?.candidates).includes("invented-rule")).toBe(false);
+    expect(JSON.stringify(fact?.candidates).includes('"kind":"rule"')).toBe(false);
+  });
+
+  test("downgrades internal_context that is not in the task fragments", async () => {
+    const mixed: ReviewCandidate[] = [
+      {
+        ...candidateOn("市教育局局长王海涛", "职务待核验", null),
+        type: "person",
+        evidence: [
+          {
+            kind: "internal_context",
+            excerpt: "市教育局局长王海涛",
+            citation_validated: true,
+          },
+          {
+            kind: "internal_context",
+            excerpt: "SECRET_FULL_TEXT_MARKER",
+            citation_validated: true,
+          },
+        ],
+      },
+    ];
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve(mixed),
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.candidates[0]?.evidence).toEqual([
+      {
+        kind: "internal_context",
+        excerpt: "市教育局局长王海涛",
+        citation_validated: true,
+      },
+      {
+        kind: "ai_judgment",
+        excerpt: "SECRET_FULL_TEXT_MARKER",
+        citation_validated: false,
+      },
+    ]);
   });
 });

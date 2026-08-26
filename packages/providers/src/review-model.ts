@@ -28,10 +28,16 @@ export type ProviderCallUsage = {
   latency_ms: number;
 };
 
+export type SpecialistJsonCompletion = {
+  system: string;
+  user: string;
+};
+
 export interface ReviewModel {
   readonly provider: ReviewProvider;
   readonly model: string | null;
   review(article: CanonicalArticle, context?: ReviewPromptContext): Promise<ReviewCandidate[]>;
+  completeJson?(input: SpecialistJsonCompletion): Promise<ReviewCandidate[]>;
   consumeLastUsage?(): ProviderCallUsage | null;
   consumeLastProvenance?(): ReviewExecutionProvenance | null;
 }

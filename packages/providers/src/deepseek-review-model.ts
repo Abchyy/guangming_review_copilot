@@ -34,6 +34,7 @@ import type {
   ProviderCallUsage,
   ReviewModel,
   ReviewPromptContext,
+  SpecialistJsonCompletion,
 } from "./review-model";
 
 const JSON_OUTPUT_INSTRUCTION = `你必须输出 json 对象，不要输出 Markdown 代码围栏。EXAMPLE JSON OUTPUT:
@@ -160,12 +161,19 @@ export class DeepSeekReviewModel implements ReviewModel {
     article: CanonicalArticle,
     context: ReviewPromptContext = {},
   ): Promise<ReviewCandidate[]> {
+    return this.completeJson({
+      system: buildReviewSystemPrompt(context),
+      user: buildReviewUserPrompt(article.title, article.body, context),
+    });
+  }
+
+  async completeJson(input: SpecialistJsonCompletion): Promise<ReviewCandidate[]> {
     const startedAt = Date.now();
     const attempts: ProviderAttempt[] = [];
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= DEEPSEEK_RETRY_POLICY.max_attempts; attempt += 1) {
-      const result = await this.reviewOnce(article, context, attempt);
+      const result = await this.completeOnce(input.system, input.user, attempt);
       attempts.push(result.attempt);
       if (result.ok) {
         this.commitProvenance(attempts, startedAt);
@@ -197,9 +205,9 @@ export class DeepSeekReviewModel implements ReviewModel {
     this.lastUsage = projectUsage(this.lastProvenance);
   }
 
-  private async reviewOnce(
-    article: CanonicalArticle,
-    context: ReviewPromptContext,
+  private async completeOnce(
+    system: string,
+    user: string,
     attempt: number,
   ): Promise<
     | { ok: true; candidates: ReviewCandidate[]; attempt: ProviderAttempt }
@@ -215,13 +223,14 @@ export class DeepSeekReviewModel implements ReviewModel {
         messages: [
           {
             role: "system",
-            content: `${buildReviewSystemPrompt(context)}\n\n${JSON_OUTPUT_INSTRUCTION}`,
+            content: `${system}\n\n${JSON_OUTPUT_INSTRUCTION}`,
           },
           {
             role: "user",
-            content: buildReviewUserPrompt(article.title, article.body, context),
+            content: user,
           },
         ],
+
         response_format: { type: "json_object" },
         max_tokens: DEEPSEEK_RETRY_POLICY.max_tokens,
         extra_body: { thinking: { type: "disabled" } },

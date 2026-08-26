@@ -10,7 +10,13 @@ import {
   reviewCandidateSchema,
   sourceSpanSchema,
   suggestionSchema,
+  type CanonicalArticle,
+  type ReviewProvider,
 } from "./review";
+import {
+  WEB_EVIDENCE_SOURCE_TIERS,
+  type WebEvidenceRun,
+} from "./web-evidence";
 
 export const SPECIALIST_IDS = [
   "entity",
@@ -35,6 +41,13 @@ export const SPECIALIST_JUDGMENT_DECISIONS = ["keep", "verify"] as const;
 
 export const SPECIALIST_MAX_PER_ARTICLE = 2;
 
+export const SPECIALIST_TARGET_MODEL = "deepseek-v4-flash";
+
+export const SPECIALIST_DISAGREEMENT_MESSAGE = "专家结论存在分歧，待人工核实";
+export const SPECIALIST_PARTIAL_FAILURE_MESSAGE = "专项核验部分失败，待人工核实";
+export const SPECIALIST_TIMEOUT_MESSAGE = "专项核验超时，待人工核实";
+export const SPECIALIST_FAILURE_MESSAGE = "专项核验失败，待人工核实";
+
 export const specialistRetrievedEvidenceSchema = z.object({
   source_id: z.string().min(1),
   source_name: z.string().min(1),
@@ -46,6 +59,15 @@ export const specialistRetrievedEvidenceSchema = z.object({
   excerpt: z.string().min(1),
   match_rank: z.number(),
   trigger: z.string().min(1),
+});
+
+export const specialistWebEvidenceItemSchema = z.object({
+  source_name: z.string().min(1),
+  url: z.string().min(1),
+  excerpt: z.string().min(1),
+  title: z.string().min(1).optional(),
+  source_tier: z.enum(WEB_EVIDENCE_SOURCE_TIERS),
+  published_or_version_date: z.string().nullable(),
 });
 
 export const specialistFragmentSchema = z.object({
@@ -80,6 +102,7 @@ export const specialistTaskSchema = z.object({
   preliminaryFindings: z.array(specialistPreliminaryFindingSchema).default([]),
   candidateSpans: z.array(sourceSpanSchema),
   retrievedEvidence: z.array(specialistRetrievedEvidenceSchema),
+  webEvidence: z.array(specialistWebEvidenceItemSchema).default([]),
   constraints: z.object({
     maxCandidates: z.number().int().positive(),
     deadlineMs: z.number().int().positive(),
@@ -140,6 +163,7 @@ export type ModelSpecialistId = (typeof MODEL_SPECIALIST_IDS)[number];
 export type SpecialistExecutionStatus = (typeof SPECIALIST_EXECUTION_STATUSES)[number];
 export type SpecialistJudgmentDecision = (typeof SPECIALIST_JUDGMENT_DECISIONS)[number];
 export type SpecialistRetrievedEvidence = z.infer<typeof specialistRetrievedEvidenceSchema>;
+export type SpecialistWebEvidenceItem = z.infer<typeof specialistWebEvidenceItemSchema>;
 export type SpecialistFragment = z.infer<typeof specialistFragmentSchema>;
 export type SpecialistPreliminaryFinding = z.infer<typeof specialistPreliminaryFindingSchema>;
 export type SpecialistTask = z.infer<typeof specialistTaskSchema>;
@@ -150,8 +174,21 @@ export type SpecialistJudgment = z.infer<typeof specialistJudgmentSchema>;
 export type SpecialistOrchestrationBudget = z.infer<typeof specialistOrchestrationBudgetSchema>;
 export type SpecialistOrchestrationRun = z.infer<typeof specialistOrchestrationRunSchema>;
 
+export type SpecialistRuntimeInput = {
+  article: CanonicalArticle;
+  findings: readonly SpecialistPreliminaryFinding[];
+  retrievedEvidence?: readonly SpecialistRetrievedEvidence[];
+  webEvidence?: WebEvidenceRun;
+};
+
+export interface SpecialistRuntime {
+  orchestrate(input: SpecialistRuntimeInput): Promise<SpecialistOrchestrationRun>;
+}
+
 export interface Specialist {
   readonly id: SpecialistId;
+  readonly provider?: ReviewProvider | null;
+  readonly model?: string | null;
   run(task: SpecialistTask): Promise<SpecialistResult>;
 }
 

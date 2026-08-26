@@ -33,8 +33,8 @@ export const SPECIALIST_ROLE_FINDING_TYPES: Record<
 };
 
 /**
- * Future DeepSeek-V4-flash role prompts. Not executed in this phase.
- * Each specialist is a different review perspective, not a vote.
+ * DeepSeek-V4-flash role prompts. Each specialist is a different review
+ * perspective, not a vote. Callers must pass fragments only, never the full article.
  */
 export const SPECIALIST_ROLE_PROMPTS: Record<ModelSpecialistId, string> = {
   fact_check: `你是「光明审校 Copilot」的事实核验专家，服务对象是党报、主流媒体的责任编辑。

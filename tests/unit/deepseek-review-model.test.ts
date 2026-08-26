@@ -28,6 +28,28 @@ const validOutput = {
 };
 
 describe("DeepSeek review model", () => {
+  test("completeJson sends the supplied prompts and does not inject a full article", async () => {
+    const create = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(validOutput) } }],
+      usage: { prompt_tokens: 8, completion_tokens: 3 },
+    });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+    const candidates = await model.completeJson({
+      system: "事实核验专家",
+      user: "quote=市教育局局长王海涛",
+    });
+    expect(candidates).toHaveLength(1);
+    const arg = create.mock.calls[0]?.[0] as {
+      messages: Array<{ content: string }>;
+    };
+    expect(arg.messages[0]?.content).toContain("事实核验专家");
+    expect(arg.messages[1]?.content).toBe("quote=市教育局局长王海涛");
+    expect(arg.messages.some((item) => item.content.includes("【正文】"))).toBe(false);
+  });
+
   test("uses json_object, disables thinking, and validates schema", async () => {
     const create = vi.fn().mockResolvedValue({
       choices: [{ message: { content: JSON.stringify(validOutput) } }],
