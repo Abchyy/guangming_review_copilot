@@ -12,6 +12,10 @@ import { ArticleDocument } from "@/components/review/ArticleDocument";
 import { FindingList } from "@/components/review/FindingList";
 import { Masthead } from "@/components/review/Masthead";
 import {
+  SpecialistOrchestrationPanel,
+  hasPendingSpecialistVerification,
+} from "@/components/review/SpecialistOrchestrationPanel";
+import {
   WebEvidencePanel,
   hasUnverifiedWebEvidence,
 } from "@/components/review/WebEvidencePanel";
@@ -153,6 +157,8 @@ export function DesktopReviewLayout({
   const elapsedSeconds = (review.pipeline.elapsed_ms / 1000).toFixed(1);
   const webEvidence = review.pipeline.web_evidence;
   const unverifiedWebEvidence = hasUnverifiedWebEvidence(webEvidence);
+  const specialistRun = review.pipeline.specialist_orchestration ?? null;
+  const pendingSpecialistVerification = hasPendingSpecialistVerification(specialistRun);
 
   return (
     <div
@@ -249,6 +255,7 @@ export function DesktopReviewLayout({
               <span className="sheet-summary-count">
                 审校意见 · 待处理 {unresolvedCount}
                 {unverifiedWebEvidence ? ` · ${WEB_EVIDENCE_UNVERIFIED_MESSAGE}` : ""}
+                {pendingSpecialistVerification ? " · 专项核验待核实" : ""}
               </span>
               <span className="sheet-summary-action">
                 {sheetOpen ? "收起" : "展开"}
@@ -270,8 +277,10 @@ export function DesktopReviewLayout({
               <span className="findings-count">
                 共 {totalCount} 条 · 待处理 {unresolvedCount}
                 {unverifiedWebEvidence ? ` · ${WEB_EVIDENCE_UNVERIFIED_MESSAGE}` : ""}
+                {pendingSpecialistVerification ? " · 专项核验待核实" : ""}
               </span>
             </div>
+            <SpecialistOrchestrationPanel run={specialistRun} />
             {webEvidence ? <WebEvidencePanel run={webEvidence} /> : null}
             <FindingList
               findings={review.findings}
