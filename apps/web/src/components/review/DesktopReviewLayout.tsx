@@ -3,10 +3,18 @@
 import { useEffect, useState } from "react";
 
 import type { CreateReviewResponse, FindingAction } from "@grc/contracts";
-import { createReviewResponseSchema, isUnresolvedStatus } from "@grc/contracts";
+import {
+  WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+  createReviewResponseSchema,
+  isUnresolvedStatus,
+} from "@grc/contracts";
 import { ArticleDocument } from "@/components/review/ArticleDocument";
 import { FindingList } from "@/components/review/FindingList";
 import { Masthead } from "@/components/review/Masthead";
+import {
+  WebEvidencePanel,
+  hasUnverifiedWebEvidence,
+} from "@/components/review/WebEvidencePanel";
 import { IconAlert, IconBook, IconCheck, IconRefresh } from "@/components/review/icons";
 import { selectAfterDecision, unresolvedFindings } from "@/lib/review-selection";
 
@@ -143,6 +151,8 @@ export function DesktopReviewLayout({
   const providerLabel =
     PROVIDER_LABEL[review.pipeline.provider] ?? review.pipeline.provider;
   const elapsedSeconds = (review.pipeline.elapsed_ms / 1000).toFixed(1);
+  const webEvidence = review.pipeline.web_evidence;
+  const unverifiedWebEvidence = hasUnverifiedWebEvidence(webEvidence);
 
   return (
     <div
@@ -193,6 +203,12 @@ export function DesktopReviewLayout({
           审校模型不可用，已降级为规则结果。{review.pipeline.fallback.reason}
         </p>
       ) : null}
+      {unverifiedWebEvidence ? (
+        <p className="web-evidence-banner" role="status" data-testid="web-evidence-banner">
+          <IconAlert />
+          {WEB_EVIDENCE_UNVERIFIED_MESSAGE}。该状态不表示稿件没有问题。
+        </p>
+      ) : null}
       {unresolvedCount === 0 ? (
         <p className="review-complete" role="status" data-testid="review-complete">
           <IconCheck />
@@ -232,6 +248,7 @@ export function DesktopReviewLayout({
             <span className="sheet-summary">
               <span className="sheet-summary-count">
                 审校意见 · 待处理 {unresolvedCount}
+                {unverifiedWebEvidence ? ` · ${WEB_EVIDENCE_UNVERIFIED_MESSAGE}` : ""}
               </span>
               <span className="sheet-summary-action">
                 {sheetOpen ? "收起" : "展开"}
@@ -252,13 +269,22 @@ export function DesktopReviewLayout({
               <h2 className="findings-title">审校意见</h2>
               <span className="findings-count">
                 共 {totalCount} 条 · 待处理 {unresolvedCount}
+                {unverifiedWebEvidence ? ` · ${WEB_EVIDENCE_UNVERIFIED_MESSAGE}` : ""}
               </span>
             </div>
+            {webEvidence ? <WebEvidencePanel run={webEvidence} /> : null}
             <FindingList
               findings={review.findings}
               selectedFindingId={selectedFindingId}
               pendingActionFindingId={pendingActionFindingId}
               revealNonce={listRevealNonce}
+              emptyTitle={unverifiedWebEvidence ? "本轮无正文批注" : undefined}
+              emptyDetail={
+                unverifiedWebEvidence
+                  ? "外部网页证据未能核验，不能视为没有问题。"
+                  : undefined
+              }
+              emptyCaution={unverifiedWebEvidence}
               onSelectFinding={selectFromList}
               onDecide={(findingId, action) => {
                 void decide(findingId, action);

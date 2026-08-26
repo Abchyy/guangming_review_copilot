@@ -179,6 +179,7 @@ button {
 /* ---------- 横幅与状态 ---------- */
 
 .fallback-banner,
+.web-evidence-banner,
 .review-complete,
 .action-error {
   margin: 0;
@@ -191,7 +192,8 @@ button {
   line-height: 1.6;
 }
 
-.fallback-banner {
+.fallback-banner,
+.web-evidence-banner {
   background: var(--gold-tint);
   color: #6e5716;
   border-bottom: 1px solid rgba(138, 109, 31, 0.35);
@@ -295,6 +297,166 @@ button {
   font-size: 12px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 网页证据 ---------- */
+
+.web-evidence-panel {
+  flex: none;
+  max-height: min(42%, 320px);
+  overflow: auto;
+  padding: 12px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-card);
+}
+
+.web-evidence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.web-evidence-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.web-evidence-status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.web-evidence-status-pill.status-retrieved {
+  color: var(--ink-2);
+  background: rgba(96, 90, 81, 0.12);
+}
+
+.web-evidence-status-pill.status-unverified {
+  color: var(--gold);
+  background: var(--gold-tint);
+}
+
+.web-evidence-result {
+  padding: 10px 0 4px;
+}
+
+.web-evidence-result + .web-evidence-result {
+  border-top: 1px dashed var(--line-strong);
+  margin-top: 8px;
+}
+
+.web-evidence-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.web-evidence-category {
+  color: var(--ink-2);
+}
+
+.web-evidence-query {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.web-evidence-message {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+
+.web-evidence-unverified {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--gold-tint);
+  color: #6e5716;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.web-evidence-item {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-inset);
+}
+
+.web-evidence-field {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr);
+  gap: 8px 10px;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.web-evidence-field:last-child {
+  margin-bottom: 0;
+}
+
+.web-evidence-field dt {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.web-evidence-field dd {
+  margin: 0;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.web-evidence-item a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.web-evidence-tier {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  background: rgba(96, 90, 81, 0.12);
+  color: var(--ink-2);
+}
+
+.web-evidence-tier.tier-official {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+}
+
+.web-evidence-tier.tier-authoritative {
+  background: var(--gold-tint);
+  color: var(--gold);
 }
 
 /* ---------- 纸面正文 ---------- */
@@ -837,6 +999,14 @@ button {
   color: var(--ok);
 }
 
+.finding-empty.is-caution {
+  color: #6e5716;
+}
+
+.finding-empty.is-caution svg {
+  color: var(--gold);
+}
+
 .finding-empty strong {
   font-family: var(--serif);
   font-size: 15px;
@@ -1074,6 +1244,7 @@ button {
   }
 
   .fallback-banner,
+  .web-evidence-banner,
   .review-complete,
   .action-error {
     padding: 8px 20px;
@@ -1168,6 +1339,16 @@ button {
     padding: 12px 16px 24px;
   }
 
+  .web-evidence-panel {
+    max-height: min(36%, 240px);
+    padding: 10px 16px 12px;
+  }
+
+  .web-evidence-field {
+    grid-template-columns: 4.5em minmax(0, 1fr);
+    font-size: 12px;
+  }
+
   .review-shell.is-reading .source-mark {
     background: transparent;
     border-bottom-color: transparent;
@@ -1229,6 +1410,7 @@ button {
   }
 
   .fallback-banner,
+  .web-evidence-banner,
   .review-complete,
   .action-error {
     padding: 8px 16px;
