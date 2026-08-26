@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { DeepSeekReviewModel, DEEPSEEK_RETRY_POLICY } from "@grc/providers";
+import {
+  DeepSeekReviewModel,
+  DEEPSEEK_RETRY_POLICY,
+  PRODUCT_JSON_COMPACT_INSTRUCTION,
+} from "@grc/providers";
 import { parseLlmReviewOutput, ReviewProviderError } from "@grc/contracts";
 
 const validOutput = {
@@ -87,7 +91,29 @@ describe("DeepSeek review model", () => {
     expect(arg.extra_body.thinking.type).toBe("disabled");
     expect(create.mock.calls[0]?.[1]).toBeUndefined();
     expect(arg.messages[0]?.content.toLowerCase()).toContain("json");
+    expect(arg.messages[0]?.content).not.toContain(PRODUCT_JSON_COMPACT_INSTRUCTION);
     expect(parseLlmReviewOutput({ candidates }).candidates).toHaveLength(1);
+  });
+
+  test("product review uses a compact JSON budget without changing official retry max_tokens", async () => {
+    const create = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(validOutput) } }],
+    });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+    await model.review(
+      { title: "标题", body: "座谈谈会", version: 1 },
+      { maxTokens: 3072 },
+    );
+    const arg = create.mock.calls[0]?.[0] as {
+      max_tokens: number;
+      messages: Array<{ content: string }>;
+    };
+    expect(arg.max_tokens).toBe(3072);
+    expect(arg.messages[0]?.content).toContain(PRODUCT_JSON_COMPACT_INSTRUCTION);
+    expect(DEEPSEEK_RETRY_POLICY.max_tokens).toBe(8192);
   });
 
   test("retries once on malformed JSON then passes", async () => {

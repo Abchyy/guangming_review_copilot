@@ -6,10 +6,12 @@ import { FixtureReviewModel, type ReviewModel } from "@grc/providers";
 import {
   PRODUCT_REVIEW_DEADLINE_MS,
   PRODUCT_REVIEW_MAX_ELAPSED_MS,
+  PRODUCT_REVIEW_MAX_TOKENS,
   PRODUCT_REVIEW_SETTLE_MS,
   createReview,
   productAbortAtMs,
 } from "@grc/review-core";
+import type { ReviewPromptContext } from "@grc/providers";
 import { createModelSpecialists, createSpecialistRuntime } from "@grc/agent-orchestration";
 import {
   SearchProviderTimeoutError,
@@ -70,6 +72,38 @@ describe("product review deadline", () => {
     expect(PRODUCT_REVIEW_SETTLE_MS).toBeGreaterThan(0);
     expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeLessThan(PRODUCT_REVIEW_DEADLINE_MS);
     expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeGreaterThan(50_000);
+    expect(PRODUCT_REVIEW_MAX_TOKENS).toBe(3072);
+    expect(PRODUCT_REVIEW_MAX_TOKENS).toBeLessThan(8192);
+  });
+
+  test("product deadline path asks the main reviewer for compact JSON under 3072 tokens", async () => {
+    const seen: ReviewPromptContext[] = [];
+    const model: ReviewModel = {
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      review(_article, context = {}) {
+        seen.push(context);
+        return Promise.resolve([]);
+      },
+    };
+    await createReview(article, model, { deadlineMs: 5_000 });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.maxTokens).toBe(PRODUCT_REVIEW_MAX_TOKENS);
+    expect(seen[0]?.timeoutMs).toBeGreaterThan(0);
+  });
+
+  test("official-style createReview without a deadline does not force a compact token cap", async () => {
+    const seen: ReviewPromptContext[] = [];
+    const model: ReviewModel = {
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      review(_article, context = {}) {
+        seen.push(context);
+        return Promise.resolve([]);
+      },
+    };
+    await createReview(article, model);
+    expect(seen[0]?.maxTokens).toBeUndefined();
   });
 
   test("a hanging provider is aborted and degrades to rules_only under 60s", async () => {

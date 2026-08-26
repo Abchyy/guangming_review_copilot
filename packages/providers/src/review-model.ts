@@ -21,6 +21,7 @@ export type ReviewPromptContext = {
   ruleHits?: RulePromptHit[];
   signal?: AbortSignal;
   timeoutMs?: number;
+  maxTokens?: number;
 };
 
 export type ProviderCallUsage = {

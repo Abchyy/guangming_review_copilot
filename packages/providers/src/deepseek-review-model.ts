@@ -40,6 +40,10 @@ import type {
 const JSON_OUTPUT_INSTRUCTION = `你必须输出 json 对象，不要输出 Markdown 代码围栏。EXAMPLE JSON OUTPUT:
 {"candidates":[{"type":"basic_text","severity":"low","title":"错别字","reason":"正文将座谈会写成座谈谈会。","suggestion":{"text":"改为座谈会。","replacement":"座谈会"},"confidence":0.9,"evidence":[{"kind":"ai_judgment","excerpt":"常见会议名称应为座谈会。","citation_validated":false}],"source":{"field":"body","exact_quote":"座谈谈会","paragraph_index":0,"context_before":null,"context_after":null}}]}`;
 
+/** Product-only. Official holdout review() omits maxTokens and does not append this. */
+export const PRODUCT_JSON_COMPACT_INSTRUCTION =
+  "必须一次输出完整闭合的 json。每个 title、reason、excerpt、suggestion.text 各不超过 40 个汉字；不要重复 candidates，不要输出 schema 以外的文字。";
+
 export const DEEPSEEK_RETRY_POLICY = {
   max_attempts: 2,
   timeout_ms: 60_000,
@@ -238,11 +242,16 @@ export class DeepSeekReviewModel implements ReviewModel {
     article: CanonicalArticle,
     context: ReviewPromptContext = {},
   ): Promise<ReviewCandidate[]> {
+    const system = buildReviewSystemPrompt(context);
     return this.completeJson({
-      system: buildReviewSystemPrompt(context),
+      system:
+        context.maxTokens != null
+          ? `${system}\n\n${PRODUCT_JSON_COMPACT_INSTRUCTION}`
+          : system,
       user: buildReviewUserPrompt(article.title, article.body, context),
       signal: context.signal,
       timeoutMs: context.timeoutMs,
+      maxTokens: context.maxTokens,
     });
   }
 

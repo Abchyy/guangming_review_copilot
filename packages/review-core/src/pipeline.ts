@@ -65,6 +65,8 @@ export type CreateReviewOptions = {
 /** Product reviews must finish or degrade under the Next.js route cap. */
 export const PRODUCT_REVIEW_DEADLINE_MS = 55_000;
 export const PRODUCT_REVIEW_MAX_ELAPSED_MS = 60_000;
+/** Product main-review output budget. Official holdout still uses DEEPSEEK_RETRY_POLICY.max_tokens. */
+export const PRODUCT_REVIEW_MAX_TOKENS = 3072;
 /** Leave time to assemble the response after abort so wall clock stays ≤ deadline. */
 export const PRODUCT_REVIEW_SETTLE_MS = 400;
 
@@ -250,7 +252,7 @@ async function createReviewWithSignal(
           excerpt: item.excerpt,
         })),
         ...(options.deadlineMs != null || options.signal
-          ? { signal, timeoutMs: modelTimeoutMs }
+          ? { signal, timeoutMs: modelTimeoutMs, maxTokens: PRODUCT_REVIEW_MAX_TOKENS }
           : {}),
       });
       rawCandidates = await raceAbort(reviewWork, options.deadlineMs != null || options.signal ? signal : undefined, () => {
