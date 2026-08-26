@@ -8,15 +8,18 @@ import {
   REVIEW_COMPACT_MEDIA_QUERY,
 } from "@/components/review/DesktopReviewLayout";
 import { ReviewApp } from "@/components/review/ReviewApp";
+import { SPECIALIST_DISABLED_MESSAGE } from "@/components/review/specialist-orchestration-view";
 import type {
   CreateReviewResponse,
   Finding,
+  SpecialistOrchestrationRun,
   WebEvidenceResult,
   WebEvidenceRun,
 } from "@grc/contracts";
 import {
   WEB_EVIDENCE_RETRIEVED_MESSAGE,
   WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+  specialistOrchestrationRunSchema,
 } from "@grc/contracts";
 
 const articleBody = "第一段有错别字座谈谈会。\n\n第二段写王强在总结时强调。";
@@ -146,6 +149,122 @@ function withWebEvidence(
       ...review.pipeline,
       ...extras?.pipeline,
       web_evidence: run,
+    },
+  };
+}
+
+const PERSON_QUOTE = "市教育局局长王海涛";
+const CITATION_QUOTE = "王强在总结时强调开学工作";
+const DISAGREEMENT_REASON = "专家结论存在分歧，待人工核实";
+const TIMEOUT_REASON = "专项核验超时，待人工核实";
+
+function specialistRun(extras: Partial<SpecialistOrchestrationRun> = {}): SpecialistOrchestrationRun {
+  return specialistOrchestrationRunSchema.parse({
+    enabled: true,
+    target_model: "deepseek-v4-flash",
+    dispatched: ["fact_check", "news_edit"],
+    skipped: [],
+    budget: { max_specialists: 2, used: 2 },
+    results: [
+      {
+        taskId: "fact_check:1",
+        candidates: [
+          {
+            type: "person",
+            severity: "high",
+            title: "职务待核验",
+            reason: "人名与职务可能不匹配。",
+            suggestion: { text: "核对公开职务", replacement: null },
+            confidence: 0.72,
+            evidence: [
+              {
+                kind: "internal_context",
+                excerpt: PERSON_QUOTE,
+                citation_validated: true,
+              },
+              {
+                kind: "retrieved_source",
+                excerpt: "市教育局党委书记、局长王海涛出席会议并讲话。",
+                citation_validated: false,
+                source_id: "source-edu-bureau",
+                source_url: "https://example.invalid/edu",
+              },
+            ],
+            source: {
+              field: "body",
+              exact_quote: PERSON_QUOTE,
+              paragraph_index: 0,
+              context_before: "上周四召开座谈会。",
+              context_after: "出席会议并讲话。",
+            },
+          },
+        ],
+        provenance: {
+          taskId: "fact_check:1",
+          specialist: "fact_check",
+          invoked: true,
+          status: "succeeded",
+          provider: "fixture",
+          model: "fake-specialist",
+          elapsedMs: 12,
+        },
+        warnings: [],
+      },
+      {
+        taskId: "news_edit:1",
+        candidates: [
+          {
+            type: "citation",
+            severity: "high",
+            title: "引语归属待核验",
+            reason: "总结发言人可能不是王强。",
+            suggestion: { text: "改为王海涛", replacement: "王海涛在总结时强调开学工作" },
+            confidence: 0.64,
+            evidence: [
+              {
+                kind: "ai_judgment",
+                excerpt: "仅根据文内信息判断，不能视为已证实。",
+                citation_validated: false,
+              },
+            ],
+            source: {
+              field: "body",
+              exact_quote: CITATION_QUOTE,
+              paragraph_index: 0,
+              context_before: null,
+              context_after: null,
+            },
+          },
+        ],
+        provenance: {
+          taskId: "news_edit:1",
+          specialist: "news_edit",
+          invoked: true,
+          status: "succeeded",
+          provider: "fixture",
+          model: "fake-specialist",
+          elapsedMs: 9,
+        },
+        warnings: [],
+      },
+    ],
+    judgments: [],
+    warnings: [],
+    ...extras,
+  });
+}
+
+function withSpecialistOrchestration(
+  run: SpecialistOrchestrationRun,
+  extras?: Partial<CreateReviewResponse>,
+): CreateReviewResponse {
+  return {
+    ...review,
+    ...extras,
+    pipeline: {
+      ...review.pipeline,
+      ...extras?.pipeline,
+      specialist_orchestration: run,
     },
   };
 }
@@ -695,6 +814,218 @@ describe("compact web evidence sheet", () => {
     );
     expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
     expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+  });
+});
+
+describe("specialist orchestration review wiring", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(false);
+  });
+
+  test("omitted specialist_orchestration is passed as disabled and does not imply a model call", () => {
+    expect(review.pipeline).not.toHaveProperty("specialist_orchestration");
+    render(<Harness />);
+    const panel = screen.getByTestId("specialist-orchestration-panel");
+    expect(panel.getAttribute("data-enabled")).toBe("false");
+    expect(screen.getByTestId("specialist-orchestration-enabled").textContent).toBe("未启用");
+    expect(screen.getByTestId("specialist-orchestration-summary").textContent).toBe(
+      SPECIALIST_DISABLED_MESSAGE,
+    );
+    expect(screen.getByTestId("specialist-call-fact_check").textContent).toContain("未调用");
+    expect(screen.getByTestId("specialist-call-news_edit").textContent).toContain("未调用");
+    expect(panel.textContent).not.toContain("已返回");
+    expect(panel.textContent).not.toContain("已调用");
+    expect(panel.textContent).not.toContain("目标模型");
+    expect(panel.textContent).not.toContain("没有问题");
+    expect(screen.queryByTestId("specialist-candidate-fact_check-0")).toBeNull();
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+  });
+
+  test("reads specialist_orchestration from the review pipeline and shows call status, fragments, candidates, and evidence", () => {
+    render(<Harness initial={withSpecialistOrchestration(specialistRun())} />);
+    const panel = screen.getByTestId("specialist-orchestration-panel");
+    expect(panel.getAttribute("data-enabled")).toBe("true");
+    expect(screen.getByTestId("specialist-orchestration-enabled").textContent).toBe("已启用");
+    expect(screen.getByTestId("specialist-call-fact_check").textContent).toContain("已返回");
+    expect(screen.getByTestId("specialist-call-news_edit").textContent).toContain("已返回");
+    expect(panel.textContent).toContain("审校片段");
+    expect(screen.getByTestId("specialist-fragment-0").textContent).toContain(PERSON_QUOTE);
+    expect(screen.getByTestId("specialist-candidate-fact_check-0").textContent).toContain(
+      "职务待核验",
+    );
+    expect(panel.textContent).toContain("证据");
+    expect(screen.getByTestId("specialist-evidence-fact_check-0-1").textContent).toContain(
+      "检索来源",
+    );
+    expect(
+      screen.getByTestId("specialist-evidence-fact_check-0-1").querySelector("a")?.getAttribute(
+        "href",
+      ),
+    ).toBe("https://example.invalid/edu");
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+    expect(screen.queryByTestId("web-evidence-panel")).toBeNull();
+  });
+
+  test("timeout and disagreement reasons from the review response stay visible as 待人工核实", () => {
+    const run = specialistRun({
+      results: [
+        {
+          taskId: "fact_check:1",
+          candidates: [],
+          provenance: {
+            taskId: "fact_check:1",
+            specialist: "fact_check",
+            invoked: true,
+            status: "timed_out",
+            provider: "fixture",
+            model: "fake-specialist",
+            elapsedMs: 2000,
+          },
+          warnings: [TIMEOUT_REASON],
+        },
+        {
+          taskId: "news_edit:1",
+          candidates: [
+            {
+              type: "citation",
+              severity: "high",
+              title: "保留原文并核实",
+              reason: "引语归属存在分歧。",
+              suggestion: { text: "保留原文并核实", replacement: null },
+              confidence: 0.5,
+              evidence: [
+                {
+                  kind: "ai_judgment",
+                  excerpt: "仅根据文内信息判断。",
+                  citation_validated: false,
+                },
+              ],
+              source: {
+                field: "body",
+                exact_quote: CITATION_QUOTE,
+                paragraph_index: 0,
+                context_before: null,
+                context_after: null,
+              },
+            },
+          ],
+          provenance: {
+            taskId: "news_edit:1",
+            specialist: "news_edit",
+            invoked: true,
+            status: "succeeded",
+            provider: "fixture",
+            model: "fake-specialist",
+            elapsedMs: 11,
+          },
+          warnings: [],
+        },
+      ],
+      judgments: [
+        {
+          field: "body",
+          paragraph_index: 0,
+          quoted_text: PERSON_QUOTE,
+          decision: "verify",
+          reason: TIMEOUT_REASON,
+          specialist_ids: ["fact_check"],
+          requires_verification: true,
+        },
+        {
+          field: "body",
+          paragraph_index: 0,
+          quoted_text: CITATION_QUOTE,
+          decision: "verify",
+          reason: DISAGREEMENT_REASON,
+          specialist_ids: ["fact_check", "news_edit"],
+          requires_verification: true,
+        },
+      ],
+    });
+    render(<Harness initial={withSpecialistOrchestration(run)} />);
+    expect(screen.getByTestId("specialist-call-fact_check").textContent).toContain("调用超时");
+    expect(screen.getByTestId("specialist-verify-0").textContent).toContain(TIMEOUT_REASON);
+    expect(screen.getByTestId("specialist-verify-1").textContent).toContain(DISAGREEMENT_REASON);
+    expect(screen.getByTestId("findings-sheet-toggle").textContent).toContain("专项核验待核实");
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+  });
+
+  test("reading mode, filters, and web evidence still work with specialist_orchestration", async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        initial={withWebEvidence([retrievedEvidence()], {
+          pipeline: {
+            ...review.pipeline,
+            specialist_orchestration: specialistRun(),
+          },
+        })}
+      />,
+    );
+    expect(screen.getByTestId("specialist-orchestration-panel")).toBeTruthy();
+    expect(screen.getByTestId("web-evidence-panel")).toBeTruthy();
+    await user.click(screen.getByTestId("reading-mode-toggle"));
+    expect(screen.queryAllByTestId("source-mark")).toHaveLength(0);
+    expect(screen.getByTestId("specialist-orchestration-panel").textContent).toContain("已启用");
+    await user.selectOptions(screen.getByTestId("severity-filter"), "critical");
+    expect(screen.queryByTestId("finding-finding-001")).toBeNull();
+    expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
+    expect(screen.getByTestId("specialist-orchestration-panel")).toBeTruthy();
+  });
+});
+
+describe("compact specialist orchestration sheet", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(true);
+  });
+
+  test("collapsed compact sheet hides specialist details until expanded", async () => {
+    render(<Harness initial={withSpecialistOrchestration(specialistRun())} />);
+    await waitForCompactLayout();
+    const toggle = screen.getByTestId("findings-sheet-toggle");
+    const panel = screen.getByTestId("findings-sheet-panel");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(panel.hidden).toBe(true);
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+  });
+
+  test("expanding the compact sheet reveals specialist results and keeps findings readable", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={withSpecialistOrchestration(specialistRun())} />);
+    await waitForCompactLayout();
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(false);
+    expect(screen.getByTestId("specialist-orchestration-panel").textContent).toContain(
+      PERSON_QUOTE,
+    );
+    expect(screen.getByTestId("specialist-orchestration-panel").textContent).toContain("证据");
+    expect(screen.getByRole("link").getAttribute("href")).toBe("https://example.invalid/edu");
+    expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+  });
+
+  test("collapsed compact sheet keeps verification status visible without exposing candidate links", async () => {
+    const run = specialistRun({
+      judgments: [
+        {
+          field: "body",
+          paragraph_index: 0,
+          quoted_text: CITATION_QUOTE,
+          decision: "verify",
+          reason: DISAGREEMENT_REASON,
+          specialist_ids: ["fact_check", "news_edit"],
+          requires_verification: true,
+        },
+      ],
+    });
+    render(<Harness initial={withSpecialistOrchestration(run)} />);
+    await waitForCompactLayout();
+    expect(screen.getByTestId("findings-sheet-toggle").textContent).toContain("专项核验待核实");
+    expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(true);
+    expect(screen.queryByRole("link")).toBeNull();
   });
 });
 
