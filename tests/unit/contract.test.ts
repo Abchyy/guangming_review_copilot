@@ -189,6 +189,38 @@ describe("MA-0 specialist contracts", () => {
     expect(parsed.provenance.status).toBe("succeeded");
   });
 
+  test("accepts optional observed model and usage on specialist provenance", () => {
+    const parsed = specialistResultSchema.parse({
+      taskId: "fact_check:1",
+      candidates: [],
+      provenance: {
+        taskId: "fact_check:1",
+        specialist: "fact_check",
+        invoked: true,
+        status: "succeeded",
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        elapsedMs: 840,
+        observed_response_model: "deepseek-v4-flash",
+        attempt_count: 1,
+        aggregated_usage: {
+          input_tokens: 120,
+          input_tokens_completeness: "complete",
+          output_tokens: 40,
+          output_tokens_completeness: "complete",
+          cached_input_tokens: 0,
+          cached_input_tokens_status: "reported",
+          cached_input_tokens_completeness: "complete",
+          unobserved_usage_attempts: 0,
+        },
+      },
+      warnings: [],
+    });
+    expect(parsed.provenance.observed_response_model).toBe("deepseek-v4-flash");
+    expect(parsed.provenance.attempt_count).toBe(1);
+    expect(parsed.provenance.aggregated_usage?.input_tokens).toBe(120);
+  });
+
   test("accepts fact_check and news_edit fragment tasks without the full article", () => {
     expect(MODEL_SPECIALIST_IDS).toEqual(["fact_check", "news_edit"]);
     expect(SPECIALIST_MAX_PER_ARTICLE).toBe(2);

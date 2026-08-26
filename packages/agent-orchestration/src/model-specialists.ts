@@ -2,6 +2,7 @@ import type {
   LlmEvidenceItem,
   ModelSpecialistId,
   ReviewCandidate,
+  ReviewExecutionProvenance,
   ReviewProvider,
   Specialist,
   SpecialistFragment,
@@ -35,6 +36,7 @@ export type SpecialistCompletionClient = {
   readonly provider: ReviewProvider;
   readonly model: string | null;
   completeJson(input: SpecialistCompletionInput): Promise<ReviewCandidate[]>;
+  consumeLastProvenance?(): ReviewExecutionProvenance | null;
 };
 
 export function buildSpecialistUserPrompt(task: SpecialistTask): string {
@@ -278,6 +280,7 @@ export class ModelSpecialist implements Specialist {
       maxRetries: SPECIALIST_SDK_MAX_RETRIES,
       timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
     });
+    const execution = this.client.consumeLastProvenance?.() ?? null;
     const candidates = sanitizeSpecialistCandidates(this.id, task, raw);
     return parseSpecialistResult({
       taskId: task.taskId,
@@ -290,6 +293,13 @@ export class ModelSpecialist implements Specialist {
         provider: this.provider,
         model: this.model,
         elapsedMs: Math.max(0, Date.now() - started),
+        ...(execution
+          ? {
+              observed_response_model: execution.observed_response_model,
+              attempt_count: execution.attempt_count,
+              aggregated_usage: execution.aggregated_usage,
+            }
+          : {}),
       },
       warnings: [],
     });

@@ -6,6 +6,7 @@ import {
   FINDING_TYPES,
   REVIEW_PROVIDERS,
   SEVERITIES,
+  aggregatedUsageSchema,
   articleSchema,
   reviewCandidateSchema,
   sourceSpanSchema,
@@ -118,6 +119,9 @@ export const agentExecutionProvenanceSchema = z.object({
   provider: z.enum(REVIEW_PROVIDERS).nullable(),
   model: z.string().nullable(),
   elapsedMs: z.number().nonnegative(),
+  observed_response_model: z.string().nullable().optional(),
+  attempt_count: z.number().int().nonnegative().optional(),
+  aggregated_usage: aggregatedUsageSchema.optional(),
 });
 
 export const specialistResultSchema = z.object({

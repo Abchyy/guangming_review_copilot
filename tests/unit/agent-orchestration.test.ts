@@ -533,6 +533,54 @@ describe("DeepSeek specialist adapter", () => {
     expect(run.results.every((item) => item.provenance.model === "deepseek-v4-flash")).toBe(true);
   });
 
+  test("model specialists copy observed model and usage from the completion client", async () => {
+    let calls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson: () => Promise.resolve([]),
+      consumeLastProvenance() {
+        calls += 1;
+        return {
+          adapter_provider: "deepseek",
+          requested_model: "deepseek-v4-flash",
+          observed_response_model: "deepseek-v4-flash",
+          observed_response_model_status: "observed",
+          attempt_count: 1,
+          attempts: [],
+          aggregated_usage: {
+            input_tokens: 90 + calls,
+            input_tokens_completeness: "complete",
+            output_tokens: 20,
+            output_tokens_completeness: "complete",
+            cached_input_tokens: 0,
+            cached_input_tokens_status: "reported",
+            cached_input_tokens_completeness: "complete",
+            unobserved_usage_attempts: 0,
+          },
+          application_cache: { enabled: false, hit: false },
+          latency_ms: 100,
+        };
+      },
+    }));
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding, consistencyFinding],
+    });
+
+    expect(calls).toBe(2);
+    expect(
+      run.results.every(
+        (item) =>
+          item.provenance.observed_response_model === "deepseek-v4-flash" &&
+          item.provenance.attempt_count === 1 &&
+          item.provenance.aggregated_usage?.output_tokens === 20,
+      ),
+    ).toBe(true);
+    const inputTokens = run.results.map((item) => item.provenance.aggregated_usage?.input_tokens);
+    expect(new Set(inputTokens).size).toBe(2);
+  });
+
   test("drops basic_text and quotes that are not in the current task fragments", async () => {
     const mixed: ReviewCandidate[] = [
       candidateOn("座谈谈会", "错别字", "座谈会"),
