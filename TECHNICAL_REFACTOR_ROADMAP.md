@@ -1124,7 +1124,8 @@ fallback_status
 本文档原始规划保留如上。本轮已在工作树落地的范围：
 
 - Phase 0–4、Phase 6：npm workspaces、`apps/web`、`packages/{contracts,review-core,rules-engine,retrieval,providers,review-store,benchmark,holdout-protocol,test-kit}`
-- MA-0：task/result/provenance 契约已按 specialist、candidate spans、retrieved evidence、constraints、warnings 预留；`specialists_enabled: false`，未进入产品主链路
+- MA-0：task/result/provenance 契约已按 specialist、candidate spans、retrieved evidence、constraints、warnings 预留
+- 多 Agent 运行时：`createReview` 经可选 `SpecialistRuntime` 接入；默认关闭，仅 `REVIEW_SPECIALISTS_ENABLED=1` 时由 Route Handler 注入 DeepSeek-V4-flash `fact_check` / `news_edit`
 - 行为修复：政策名年份不再误当事件年；fusion 仅合并 evidence 并整组保留 winner 语义；移动端正文标记会展开 bottom sheet；阅读模式；风险/类型筛选；带 authority 与可点击 URL 的 retrieved evidence UI；产品 provider 失败时 rules_only 降级（不用 fixture 冒充真实稿件结果），official locked 路径拒绝任何 fallback
 - 测试辅助统一从 `@grc/test-kit` 公共入口导入，不再保留 `tests/helpers` 副本
 - 旧 System Freeze artifact **不兼容** 新 `packages/**` 路径，需重新 freeze

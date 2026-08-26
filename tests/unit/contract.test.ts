@@ -227,6 +227,7 @@ describe("MA-0 specialist contracts", () => {
     });
     expect(parsed.article).toBeUndefined();
     expect(parsed.fragments).toHaveLength(1);
+    expect(parsed.webEvidence).toEqual([]);
     expect(parsed.preliminaryFindings[0]?.type).toBe("policy");
   });
 

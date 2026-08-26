@@ -159,6 +159,9 @@ function buildCandidates(task: SpecialistTask, options: FakeSpecialistOptions): 
 }
 
 class FakeModelSpecialist implements Specialist {
+  readonly provider = FAKE_SPECIALIST_PROVIDER;
+  readonly model = FAKE_SPECIALIST_MODEL;
+
   constructor(
     readonly id: ModelSpecialistId,
     private readonly options: FakeSpecialistOptions = {},
@@ -167,6 +170,9 @@ class FakeModelSpecialist implements Specialist {
   async run(task: SpecialistTask): Promise<SpecialistResult> {
     if (task.specialist !== this.id) {
       throw new SpecialistExecutionError(`task specialist ${task.specialist} does not match ${this.id}`);
+    }
+    if (task.article) {
+      throw new SpecialistExecutionError(`${this.id} must not receive the full article`);
     }
     const started = Date.now();
     const behavior = behaviorOf(task, this.options);

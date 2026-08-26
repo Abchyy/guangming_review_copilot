@@ -29,6 +29,7 @@ export const FREEZE_ASSET_PATHS = [
   "packages/contracts/src/index.ts",
   "packages/providers/src/prompt.ts",
   "packages/contracts/src/review.ts",
+  "packages/contracts/src/review-response.ts",
   "packages/contracts/src/specialists.ts",
   "data/rules/catalog.json",
   "data/corpus/references.json",

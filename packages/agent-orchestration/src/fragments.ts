@@ -3,7 +3,9 @@ import type {
   SpecialistFragment,
   SpecialistPreliminaryFinding,
   SpecialistRetrievedEvidence,
+  SpecialistWebEvidenceItem,
   SourceSpan,
+  WebEvidenceRun,
 } from "@grc/contracts";
 
 import { FRAGMENT_CONTEXT_CHARS } from "./config";
@@ -64,6 +66,20 @@ export function fragmentToSpan(fragment: SpecialistFragment): SourceSpan {
   };
 }
 
+function specialistHaystacks(
+  fragments: readonly SpecialistFragment[],
+  findings: readonly SpecialistPreliminaryFinding[],
+): string[] {
+  return [
+    ...fragments.map((item) => item.quoted_text),
+    ...findings.map((item) => `${item.title}\n${item.reason}\n${item.source_span.quoted_text}`),
+  ];
+}
+
+function textOverlaps(left: string, right: string): boolean {
+  return left.length > 0 && right.length > 0 && (left.includes(right) || right.includes(left));
+}
+
 export function evidenceForFragments(
   fragments: readonly SpecialistFragment[],
   findings: readonly SpecialistPreliminaryFinding[],
@@ -72,10 +88,7 @@ export function evidenceForFragments(
   if (evidence.length === 0 || (fragments.length === 0 && findings.length === 0)) {
     return [];
   }
-  const haystacks = [
-    ...fragments.map((item) => item.quoted_text),
-    ...findings.map((item) => `${item.title}\n${item.reason}\n${item.source_span.quoted_text}`),
-  ];
+  const haystacks = specialistHaystacks(fragments, findings);
   return evidence.filter((item) =>
     haystacks.some(
       (text) =>
@@ -84,6 +97,49 @@ export function evidenceForFragments(
         (item.excerpt.length > 0 && item.excerpt.includes(item.trigger) && text.includes(item.trigger)),
     ),
   );
+}
+
+export function webEvidenceForFragments(
+  fragments: readonly SpecialistFragment[],
+  findings: readonly SpecialistPreliminaryFinding[],
+  evidence: readonly SpecialistWebEvidenceItem[],
+): SpecialistWebEvidenceItem[] {
+  if (evidence.length === 0 || (fragments.length === 0 && findings.length === 0)) {
+    return [];
+  }
+  const haystacks = specialistHaystacks(fragments, findings);
+  return evidence.filter((item) =>
+    haystacks.some(
+      (text) =>
+        textOverlaps(text, item.excerpt) ||
+        (item.title != null && textOverlaps(text, item.title)),
+    ),
+  );
+}
+
+export function webEvidenceItemsFromRun(
+  run: WebEvidenceRun | undefined,
+): SpecialistWebEvidenceItem[] {
+  if (!run) {
+    return [];
+  }
+  const items: SpecialistWebEvidenceItem[] = [];
+  for (const result of run.results) {
+    if (result.status !== "retrieved") {
+      continue;
+    }
+    for (const item of result.evidence) {
+      items.push({
+        source_name: item.source_name,
+        url: item.url,
+        excerpt: item.excerpt,
+        title: item.title,
+        source_tier: item.source_tier,
+        published_or_version_date: item.published_or_version_date,
+      });
+    }
+  }
+  return items;
 }
 
 export function specialistTaskContainsFullArticle(

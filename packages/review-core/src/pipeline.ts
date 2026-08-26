@@ -1,18 +1,27 @@
 import {
   BODY_MAX_LENGTH,
+  MODEL_SPECIALIST_IDS,
+  SPECIALIST_FAILURE_MESSAGE,
+  SPECIALIST_MAX_PER_ARTICLE,
+  SPECIALIST_TARGET_MODEL,
   TITLE_MAX_LENGTH,
   WEB_EVIDENCE_UNVERIFIED_MESSAGE,
   createReviewResponseSchema,
-  ReviewProviderError,
-  ReviewRequestError,
   findingSchema,
   parseLlmReviewOutput,
+  parseSpecialistOrchestrationRun,
   parseWebEvidenceRun,
+  ReviewProviderError,
+  ReviewRequestError,
   type CanonicalArticle,
   type CreateReviewRequest,
   type CreateReviewResponse,
   type Finding,
   type ReviewCandidate,
+  type SpecialistJudgment,
+  type SpecialistOrchestrationRun,
+  type SpecialistRetrievedEvidence,
+  type SpecialistRuntime,
   type WebEvidenceCollector,
   type WebEvidenceRun,
 } from "@grc/contracts";
@@ -46,6 +55,8 @@ export type CreateReviewOptions = {
   disableRetrieval?: boolean;
   /** Optional Web Evidence collector. Default off; review-core never calls a search vendor. */
   webEvidenceCollector?: WebEvidenceCollector | null;
+  /** Optional specialist runtime. Default off; review-core never imports the orchestration package. */
+  specialistRuntime?: SpecialistRuntime | null;
 };
 
 
@@ -233,10 +244,32 @@ export async function createReview(
     findings,
   );
 
+  const specialistRun = await runSpecialists(
+    options.specialistRuntime,
+    article,
+    findings,
+    retrieved.map((item) => ({
+      source_id: item.source_id,
+      source_name: item.source_name,
+      source_url: item.source_url,
+      authority_level: item.authority_level,
+      published_at: item.published_at,
+      valid_from: item.valid_from,
+      valid_to: item.valid_to,
+      excerpt: item.excerpt,
+      match_rank: item.match_rank,
+      trigger: item.trigger,
+    })),
+    webEvidence,
+  );
+  const finalized = specialistRun
+    ? applySpecialistJudgments(findings, specialistRun)
+    : findings;
+
   const response: CreateReviewResponse = {
     review_id: crypto.randomUUID(),
     article,
-    findings,
+    findings: finalized,
     pipeline: {
       provider: model.provider,
       model: model.model,
@@ -246,7 +279,8 @@ export async function createReview(
       elapsed_ms: Date.now() - startedAt,
       provenance,
       fallback,
-      specialists_enabled: false,
+      specialists_enabled: specialistRun != null,
+      ...(specialistRun ? { specialist_orchestration: specialistRun } : {}),
       ...(webEvidence ? { web_evidence: webEvidence } : {}),
     },
   };
@@ -286,6 +320,79 @@ async function collectWebEvidence(
       ],
     });
   }
+}
+
+async function runSpecialists(
+  runtime: SpecialistRuntime | null | undefined,
+  article: CanonicalArticle,
+  findings: Finding[],
+  retrieved: readonly SpecialistRetrievedEvidence[],
+  webEvidence: WebEvidenceRun | undefined,
+): Promise<SpecialistOrchestrationRun | undefined> {
+  if (!runtime) {
+    return undefined;
+  }
+  try {
+    return parseSpecialistOrchestrationRun(
+      await runtime.orchestrate({
+        article,
+        findings,
+        retrievedEvidence: retrieved,
+        webEvidence,
+      }),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : SPECIALIST_FAILURE_MESSAGE;
+    return parseSpecialistOrchestrationRun({
+      enabled: true,
+      target_model: SPECIALIST_TARGET_MODEL,
+      dispatched: [],
+      skipped: [],
+      budget: { max_specialists: SPECIALIST_MAX_PER_ARTICLE, used: 0 },
+      results: [],
+      judgments: findings
+        .filter((item) => item.type !== "basic_text")
+        .map((item) => ({
+          field: item.source_span.field,
+          paragraph_index: item.source_span.paragraph_index,
+          quoted_text: item.source_span.quoted_text,
+          decision: "verify" as const,
+          reason: SPECIALIST_FAILURE_MESSAGE,
+          specialist_ids: [...MODEL_SPECIALIST_IDS],
+          requires_verification: true,
+        })),
+      warnings: [message],
+    });
+  }
+}
+
+function matchingJudgment(
+  finding: Finding,
+  judgments: readonly SpecialistJudgment[],
+): SpecialistJudgment | undefined {
+  return judgments.find(
+    (item) =>
+      item.field === finding.source_span.field &&
+      item.paragraph_index === finding.source_span.paragraph_index &&
+      item.quoted_text === finding.source_span.quoted_text,
+  );
+}
+
+function applySpecialistJudgments(
+  findings: Finding[],
+  run: SpecialistOrchestrationRun,
+): Finding[] {
+  return findings.map((finding) => {
+    const judgment = matchingJudgment(finding, run.judgments);
+    if (!judgment || judgment.decision === "keep") {
+      return finding;
+    }
+    return findingSchema.parse({
+      ...finding,
+      status: "verify",
+      requires_verification: true,
+    });
+  });
 }
 
 function validateRequest(input: CreateReviewRequest): void {

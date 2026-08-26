@@ -38,7 +38,7 @@ const FORBIDDEN: Record<string, string[]> = {
   "review-store": ["@grc/review-core", "@grc/benchmark", "@grc/holdout-protocol", "@grc/agent-orchestration", "next", "react"],
   "web-evidence": ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/agent-orchestration", "next", "react", "better-sqlite3"],
   "agent-orchestration": ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/web-evidence", "next", "react", "better-sqlite3"],
-  web: ["@grc/benchmark", "@grc/holdout-protocol", "@grc/test-kit", "@grc/agent-orchestration"],
+  web: ["@grc/benchmark", "@grc/holdout-protocol", "@grc/test-kit"],
 };
 
 describe("module boundaries", () => {
