@@ -17,6 +17,7 @@ import { createReview } from "@grc/review-core";
 | review-core | `packages/review-core` | canonicalize、fusion、rank、pipeline | `createReview`、`fuseFindings`、`rankFindings` | Next/React/SQLite/benchmark |
 | rules-engine | `packages/rules-engine` | 规则加载与命中 | `runRules`、`getRuleVersion` | HTTP、最终 Finding 决策 |
 | retrieval | `packages/retrieval` | 语料检索 | `Retriever`、`retrieveCorpus`、`RetrievedEvidence` | 直接决定 Finding、GraphRAG、外部向量库 |
+| web-evidence | `packages/web-evidence` | 轻量联网核验：Query Policy、SearchProvider、离线 fake provider | `SearchProvider`、`FakeSearchProvider`、`createWebEvidenceCollector`、`planWebEvidenceQueries` | 真实搜索服务、RAG、向量库、前端、holdout |
 | providers | `packages/providers` | 模型 adapter、prompt、cache、fallback 模式 | `ReviewModel`、`FixtureReviewModel`、`getFallbackMode` | 业务规则、排序、DB 写入 |
 | review-store | `packages/review-store` | Accept/Ignore/Verify 状态机 + SQLite | `ReviewStore`、`canTransition`、`openReviewDatabase` | Next、benchmark |
 | web | `apps/web` | UI、Route Handler 组合 | `/api/reviews` | 质量算法、holdout |
@@ -27,8 +28,8 @@ import { createReview } from "@grc/review-core";
 ## 依赖规则
 
 - `contracts` → 无业务依赖
-- `rules-engine` / `retrieval` / `providers` / `review-store` → `contracts`
-- `review-core` → `contracts` + rules + retrieval + providers
+- `rules-engine` / `retrieval` / `providers` / `review-store` / `web-evidence` → `contracts`
+- `review-core` → `contracts` + rules + retrieval + providers（可选 `WebEvidenceCollector` 接口；不得依赖 `@grc/web-evidence` 或具体搜索供应商）
 - `web` → contracts + review-core + providers + review-store
 - `benchmark` 可消费公开产品接口
 - 产品运行时 **不得** 依赖 `benchmark` 或 `holdout-protocol`
@@ -36,8 +37,20 @@ import { createReview } from "@grc/review-core";
 
 ## Pipeline 组合
 
-`createReview`：canonicalize → `runRules` → `retrieveCorpus` → provider（失败且 copilot 且有规则命中则 `rules_only` fallback）→ locate span → fuse → rank。`specialists_enabled` 恒为 `false`。
+`createReview`：canonicalize → `runRules` → `retrieveCorpus` → provider（失败且 copilot 且有规则命中则 `rules_only` fallback）→ locate span → fuse → rank → 可选 Web Evidence。`specialists_enabled` 恒为 `false`。未注入 `webEvidenceCollector` 时不查询、不改变 Finding、不写 `pipeline.web_evidence`。
 
 ## RAG 边界
 
 检索只返回带 source_id、URL、excerpt、authority、freshness/version 的 evidence。UI 展示这些字段。不引入 GraphRAG、外部向量数据库或新 embedding 依赖。
+
+本阶段的 **Web Evidence 不是 RAG**：不扩容知识库、不建索引、不做 embedding、不把网页结果写入 corpus。它只对高风险、时效性强且不确定的最小事实发出查询，返回可追溯网页证据，供模型和人工判断。
+
+## Web Evidence 边界（本阶段）
+
+- 只允许人物职务、机构名称、政策法规、日期、数字、归因进入查询。
+- 每篇稿件最多 2 个查询，每个查询最多 3 条结果。
+- 查询必须是最小事实，不得发送整篇稿件、个人信息、内部批注、holdout 或 API key。
+- 域名白名单按事实类别配置在 `DEFAULT_DOMAIN_ALLOWLIST`，不得写死在业务分支里。
+- 未检索到、超时或 provider 失败时，状态为 `unverified`，文案固定为「未能外部核验」；不得表示「没有问题」。
+- 唯一搜索适配入口是 `SearchProvider`。本阶段只有 `FakeSearchProvider`（`provider_kind: fake_offline`，`live_network: false`），不接入 Tavily / Brave / 博查或其他真实服务，不发送网络请求。
+- 下一阶段若接入真实搜索，只新增一个 `SearchProvider` 实现；`review-core` 仍然只看到 `WebEvidenceCollector` 契约。

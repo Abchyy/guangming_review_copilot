@@ -55,6 +55,9 @@
       ],
       "@grc/test-kit": [
         "./packages/test-kit/src/index.ts"
+      ],
+      "@grc/web-evidence": [
+        "./packages/web-evidence/src/index.ts"
       ]
     }
   },

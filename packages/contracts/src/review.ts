@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { webEvidenceRunSchema } from "./web-evidence";
+
 export const FINDING_TYPES = [
   "basic_text",
   "person",
@@ -225,6 +227,7 @@ export const pipelineMetadataSchema = z.object({
   provenance: reviewExecutionProvenanceSchema.optional(),
   fallback: pipelineFallbackSchema.optional(),
   specialists_enabled: z.boolean().optional(),
+  web_evidence: webEvidenceRunSchema.optional(),
 });
 
 export const createReviewResponseSchema = z.object({

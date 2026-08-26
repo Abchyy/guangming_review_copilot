@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +18,7 @@ const PACKAGES = [
   "@grc/benchmark",
   "@grc/holdout-protocol",
   "@grc/test-kit",
+  "@grc/web-evidence",
 ] as const;
 
 describe("workspace package exports", () => {
@@ -26,6 +27,19 @@ describe("workspace package exports", () => {
       workspaces?: string[];
     };
     expect(pkg.workspaces).toEqual(["apps/*", "packages/*"]);
+  });
+
+  test("each library package declares a public export to src/index.ts", () => {
+    for (const name of PACKAGES) {
+      const pkgPath = join(root, "packages", name.slice(5), "package.json");
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
+        name: string;
+        exports?: { "."?: string };
+      };
+      expect(pkg.name).toBe(name);
+      expect(pkg.exports?.["."]).toBe("./src/index.ts");
+      expect(existsSync(join(root, "packages", name.slice(5), "src/index.ts"))).toBe(true);
+    }
   });
 
   test("each library package resolves through its public export", () => {
