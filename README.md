@@ -78,6 +78,7 @@ import { createReview } from "@grc/review-core";
 | `@grc/rules-engine` | 规则目录与确定性规则 | Next、review-core、holdout |
 | `@grc/retrieval` | Retriever / 语料检索 | Next、review-core、向量库 |
 | `@grc/web-evidence` | 轻量联网核验（Query Policy + SearchProvider） | RAG、向量库、前端、holdout、把 fake 标成 live |
+| `@grc/agent-orchestration` | 默认关闭的多 Agent 编排基础（并行、预算、超时、provenance、fake specialists） | 真实模型、主链路、UI、RAG、联网搜索 |
 | `@grc/providers` | Fixture / DeepSeek / OpenAI adapter | 业务规则、DB 写入、holdout |
 | `@grc/review-store` | 状态机 + SQLite adapter | Next、review-core、benchmark |
 | `@grc/benchmark` | 开发集评估器 | 不得反向写入 prompt/rules/corpus |
@@ -97,6 +98,7 @@ npm run test:retrieval
 npm run test:providers
 npm run test:store
 npm run test:web
+npm run test:orchestration
 npm run test:benchmark
 npm run test:protocol
 ```
@@ -109,7 +111,7 @@ npm run test:protocol
 - **新增 retriever**：实现 `Retriever`（`retrieve(query: RetrievalQuery): RetrievedEvidence[]`），在 pipeline 中显式注入；不要在 retrieval 包里直接产出最终 Finding。
 - **新增 Web Evidence provider**：实现 `SearchProvider`（`@grc/web-evidence`）。离线实现是 `FakeSearchProvider`；真实实现是 `TavilySearchProvider`，仅服务端在 `WEB_EVIDENCE_ENABLED=true` 且配置了 `TAVILY_API_KEY` 时启用。不得把 fake 结果标成 live，不得获取网页全文。Query Policy 与按类别配置的域名白名单在 `web-evidence` 包内，`review-core` 只接受可选的 `WebEvidenceCollector`。
 - **新增 provider**：实现 `ReviewModel`，只负责模型 I/O 与 provenance，不写规则/排序/数据库。
-- **新增 specialist（默认不启用）**：只实现 `Specialist` / `SpecialistTask` / `SpecialistResult` 契约。`pipeline.specialists_enabled` 必须保持 `false`，产品运行时不得调用 specialist。
+- **新增 specialist（默认不启用）**：只实现 `Specialist` / `SpecialistTask` / `SpecialistResult` 契约，并在 `@grc/agent-orchestration` 用 fake specialist 做离线编排。`pipeline.specialists_enabled` 必须保持 `false`，产品运行时不得调用 specialist，也不得把规则引擎当成模型 Agent。
 
 ## 哪些改动会使 benchmark freeze 失效
 

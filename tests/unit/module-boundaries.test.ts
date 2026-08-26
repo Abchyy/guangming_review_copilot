@@ -30,14 +30,15 @@ function importsOf(file: string): string[] {
 }
 
 const FORBIDDEN: Record<string, string[]> = {
-  contracts: ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/web-evidence", "next", "react", "better-sqlite3"],
-  "review-core": ["next", "react", "better-sqlite3", "@grc/benchmark", "@grc/holdout-protocol", "@grc/review-store", "@grc/web-evidence"],
-  "rules-engine": ["@grc/review-core", "@grc/holdout-protocol", "@grc/benchmark", "next", "react"],
-  retrieval: ["@grc/review-core", "@grc/holdout-protocol", "@grc/benchmark", "next", "react"],
-  providers: ["@grc/rules-engine", "@grc/review-core", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol"],
-  "review-store": ["@grc/review-core", "@grc/benchmark", "@grc/holdout-protocol", "next", "react"],
-  "web-evidence": ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "next", "react", "better-sqlite3"],
-  web: ["@grc/benchmark", "@grc/holdout-protocol", "@grc/test-kit"],
+  contracts: ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/web-evidence", "@grc/agent-orchestration", "next", "react", "better-sqlite3"],
+  "review-core": ["next", "react", "better-sqlite3", "@grc/benchmark", "@grc/holdout-protocol", "@grc/review-store", "@grc/web-evidence", "@grc/agent-orchestration"],
+  "rules-engine": ["@grc/review-core", "@grc/holdout-protocol", "@grc/benchmark", "@grc/agent-orchestration", "next", "react"],
+  retrieval: ["@grc/review-core", "@grc/holdout-protocol", "@grc/benchmark", "@grc/agent-orchestration", "next", "react"],
+  providers: ["@grc/rules-engine", "@grc/review-core", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/agent-orchestration"],
+  "review-store": ["@grc/review-core", "@grc/benchmark", "@grc/holdout-protocol", "@grc/agent-orchestration", "next", "react"],
+  "web-evidence": ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/agent-orchestration", "next", "react", "better-sqlite3"],
+  "agent-orchestration": ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/web-evidence", "next", "react", "better-sqlite3"],
+  web: ["@grc/benchmark", "@grc/holdout-protocol", "@grc/test-kit", "@grc/agent-orchestration"],
 };
 
 describe("module boundaries", () => {
@@ -73,12 +74,17 @@ describe("module boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
-  test("client UI does not import the web-evidence package", () => {
+  test("client UI does not import the web-evidence or agent-orchestration packages", () => {
     const dir = join(root, "apps/web/src/components");
     const offenders: string[] = [];
     for (const file of walk(dir)) {
       for (const spec of importsOf(file)) {
-        if (spec === "@grc/web-evidence" || spec.startsWith("@grc/web-evidence/")) {
+        if (
+          spec === "@grc/web-evidence" ||
+          spec.startsWith("@grc/web-evidence/") ||
+          spec === "@grc/agent-orchestration" ||
+          spec.startsWith("@grc/agent-orchestration/")
+        ) {
           offenders.push(`${relative(root, file)} -> ${spec}`);
         }
       }

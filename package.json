@@ -21,6 +21,7 @@
     "test:providers": "vitest run tests/unit/config.test.ts tests/unit/deepseek-review-model.test.ts tests/unit/openai-review-model.test.ts tests/unit/fallback.test.ts",
     "test:store": "vitest run tests/unit/review-store.test.ts tests/unit/span-rebase.test.ts",
     "test:web": "vitest run tests/frontend tests/api tests/unit/highlight-segments.test.ts",
+    "test:orchestration": "vitest run tests/unit/agent-orchestration.test.ts tests/unit/contract.test.ts tests/unit/workspace-exports.test.ts tests/unit/module-boundaries.test.ts",
     "test:benchmark": "vitest run tests/unit/benchmark-evaluate.test.ts tests/benchmark/dataset.test.ts",
     "test:protocol": "vitest run tests/benchmark/holdout-protocol.test.ts tests/benchmark/holdout-custodian-connection.test.ts tests/benchmark/holdout-official-provider-binding.test.ts tests/benchmark/holdout-consumption.test.ts tests/unit/test-isolation.test.ts"
   },

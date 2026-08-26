@@ -11,6 +11,10 @@ export default defineConfig({
     alias: {
       "@": path.join(rootDir, "apps/web/src"),
       "@grc/web-evidence": path.join(rootDir, "packages/web-evidence/src/index.ts"),
+      "@grc/agent-orchestration": path.join(
+        rootDir,
+        "packages/agent-orchestration/src/index.ts",
+      ),
     },
   },
   test: {
