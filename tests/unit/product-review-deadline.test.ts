@@ -6,7 +6,9 @@ import { FixtureReviewModel, type ReviewModel } from "@grc/providers";
 import {
   PRODUCT_REVIEW_DEADLINE_MS,
   PRODUCT_REVIEW_MAX_ELAPSED_MS,
+  PRODUCT_REVIEW_SETTLE_MS,
   createReview,
+  productAbortAtMs,
 } from "@grc/review-core";
 import { createModelSpecialists, createSpecialistRuntime } from "@grc/agent-orchestration";
 import {
@@ -49,11 +51,25 @@ class HangingReviewModel implements ReviewModel {
   }
 }
 
+class IgnoreAbortReviewModel implements ReviewModel {
+  readonly provider = "deepseek" as const;
+  readonly model = "deepseek-v4-flash";
+  calls = 0;
+
+  review(): Promise<ReviewCandidate[]> {
+    this.calls += 1;
+    return new Promise(() => undefined);
+  }
+}
+
 describe("product review deadline", () => {
   test("product budget stays under the route cap", () => {
     expect(PRODUCT_REVIEW_DEADLINE_MS).toBe(55_000);
     expect(PRODUCT_REVIEW_DEADLINE_MS).toBeLessThan(PRODUCT_REVIEW_MAX_ELAPSED_MS);
     expect(PRODUCT_REVIEW_MAX_ELAPSED_MS).toBe(60_000);
+    expect(PRODUCT_REVIEW_SETTLE_MS).toBeGreaterThan(0);
+    expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeLessThan(PRODUCT_REVIEW_DEADLINE_MS);
+    expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeGreaterThan(50_000);
   });
 
   test("a hanging provider is aborted and degrades to rules_only under 60s", async () => {
@@ -148,6 +164,100 @@ describe("product review deadline", () => {
       true,
     );
     expect(result.findings.some((item) => item.status === "verify")).toBe(true);
+  });
+
+  test("a pre-aborted signal never starts model, Tavily, or specialist calls", async () => {
+    const model = new IgnoreAbortReviewModel();
+    let searches = 0;
+    const collector = createWebEvidenceCollector(
+      new TavilySearchProvider({
+        apiKey: "tvly-test-key",
+        fetchImpl: () => {
+          searches += 1;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        },
+      }),
+    );
+    let specialistCalls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        specialistCalls += 1;
+        return Promise.resolve([]);
+      },
+    }));
+    const controller = new AbortController();
+    controller.abort();
+    const started = Date.now();
+    const result = await createReview(article, model, {
+      deadlineMs: 5_000,
+      signal: controller.signal,
+      webEvidenceCollector: collector,
+      specialistRuntime: createSpecialistRuntime(specialists),
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(result.pipeline.elapsed_ms).toBeLessThanOrEqual(5_000);
+    expect(model.calls).toBe(0);
+    expect(searches).toBe(0);
+    expect(specialistCalls).toBe(0);
+    expect(result.pipeline.fallback?.mode).toBe("rules_only");
+    expect(result.pipeline.web_evidence?.query_count).toBe(0);
+    expect(result.pipeline.web_evidence?.results).toEqual([]);
+    expect(result.pipeline.specialist_orchestration?.budget.used).toBe(0);
+    expect(result.pipeline.specialist_orchestration?.dispatched).toEqual([]);
+    expect(
+      result.pipeline.specialist_orchestration?.results.every(
+        (item) =>
+          item.provenance.invoked === false &&
+          item.provenance.status === "not_invoked" &&
+          item.provenance.attempt_count === 0,
+      ),
+    ).toBe(true);
+  });
+
+  test("an ignore-abort hanging promise still returns within the deadline", async () => {
+    const model = new IgnoreAbortReviewModel();
+    let searches = 0;
+    const collector = createWebEvidenceCollector(
+      new TavilySearchProvider({
+        apiKey: "tvly-test-key",
+        timeoutMs: 8_000,
+        fetchImpl: () =>
+          new Promise(() => {
+            searches += 1;
+          }),
+      }),
+    );
+    let specialistCalls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        specialistCalls += 1;
+        return new Promise(() => undefined);
+      },
+    }));
+    const deadlineMs = 80;
+    const started = Date.now();
+    const result = await createReview(article, model, {
+      deadlineMs,
+      webEvidenceCollector: collector,
+      specialistRuntime: createSpecialistRuntime(specialists),
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(result.pipeline.elapsed_ms).toBeLessThanOrEqual(deadlineMs);
+    expect(model.calls).toBe(1);
+    expect(searches).toBe(0);
+    expect(specialistCalls).toBe(0);
+    expect(result.pipeline.fallback?.mode).toBe("rules_only");
+    expect(result.pipeline.web_evidence?.query_count).toBe(0);
+    expect(result.pipeline.specialist_orchestration?.budget.used).toBe(0);
+    expect(
+      result.pipeline.specialist_orchestration?.results.every(
+        (item) => item.provenance.invoked === false && item.provenance.attempt_count === 0,
+      ),
+    ).toBe(true);
   });
 });
 

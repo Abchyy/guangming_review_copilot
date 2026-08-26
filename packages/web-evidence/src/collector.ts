@@ -66,20 +66,64 @@ export function createWebEvidenceCollector(
         maxResultsPerQuery: options.maxResultsPerQuery ?? WEB_EVIDENCE_MAX_RESULTS_PER_QUERY,
       });
       const results: WebEvidenceResult[] = [];
+      let started = 0;
       for (const query of queries) {
         if (input.signal?.aborted) {
-          results.push(unverifiedResult(provider, query, "timeout", now));
-          continue;
+          break;
         }
+        started += 1;
         results.push(await searchSafely(provider, query, now, input.signal));
       }
       return parseWebEvidenceRun({
         enabled: true,
-        query_count: queries.length,
+        query_count: started,
         results,
       });
     },
   };
+}
+
+function swallowLater(work: Promise<unknown>): void {
+  void work.then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
+function raceAbort<T>(work: Promise<T>, signal: AbortSignal | undefined, onAbort: () => T): Promise<T> {
+  if (!signal) {
+    return work;
+  }
+  if (signal.aborted) {
+    swallowLater(work);
+    return Promise.resolve().then(onAbort);
+  }
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (apply: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      signal.removeEventListener("abort", abort);
+      apply();
+    };
+    const abort = () => {
+      swallowLater(work);
+      finish(() => {
+        try {
+          resolve(onAbort());
+        } catch (error) {
+          reject(error);
+        }
+      });
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    work.then(
+      (value) => finish(() => resolve(value)),
+      (error) => finish(() => reject(error)),
+    );
+  });
 }
 
 async function searchSafely(
@@ -88,11 +132,10 @@ async function searchSafely(
   now: () => Date,
   signal?: AbortSignal,
 ): Promise<WebEvidenceResult> {
-  if (signal?.aborted) {
-    return unverifiedResult(provider, query, "timeout", now);
-  }
   try {
-    const raw = await provider.search(query, { signal });
+    const raw = await raceAbort(provider.search(query, { signal }), signal, () => {
+      throw new SearchProviderTimeoutError();
+    });
     return sanitizeProviderResult(provider, query, raw, now);
   } catch (error) {
     return unverifiedResult(provider, query, classifyProviderError(error), now);

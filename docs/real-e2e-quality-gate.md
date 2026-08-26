@@ -4,23 +4,23 @@
 
 ## 第二轮：55s 产品 deadline（`next start`）
 
-同一 Demo，**只跑一次**，冷库（无 candidate cache）。产品路径 `PRODUCT_REVIEW_DEADLINE_MS=55_000`，不提高 `maxDuration=60`。
+同一 Demo，**只跑一次**，冷库（无 candidate cache）。产品路径 `PRODUCT_REVIEW_DEADLINE_MS=55_000`，不提高 `maxDuration=60`。当时计账把未启动的下游调用也写成了 timeout；更正如下。
 
 | 项 | 观察值 |
 | --- | --- |
 | HTTP | `POST /api/reviews` **200** |
-| 墙钟 | **55.132s**（目标 ≤55s，超出 132ms 为 abort 收尾；**未再烧 API**） |
+| 墙钟 | **55.132s**（当时 abort 后仍等待下游 Promise；已改为预留收尾且不依赖下游响应 abort） |
 | `pipeline.elapsed_ms` | **55030** |
 | `review_id` | `fe8413df-4fc7-456c-9370-6334492ced3e` |
 | Findings | 7 条规则结果；`dropped_count=0` |
-| Fallback | **`rules_only`**（`DeepSeek provider unavailable`） |
+| Fallback | **`rules_only`**（主模型在 deadline 被取消） |
 | 主审校 attempts | 1，`fatal_failure`，`received_provider_response=false` |
-| Usage / 成本 | usage **incomplete / unobserved**；成本 **indeterminate**（中途 abort） |
+| Usage / 成本 | usage **incomplete / unobserved**；成本 **indeterminate** |
 | 应用缓存 | enabled，**miss** |
-| Web Evidence | 2 条计划查询均 `unverified` / `timeout`（deadline 后未再打 Tavily） |
-| Specialist | 派发 `fact_check` 1/2；`timed_out`，`trace_status=unobserved`，`elapsedMs=0`，`unobserved_usage_attempts=1` |
+| 实际 Tavily 请求 | **0**（`query_count` 应记实际启动数。当时响应写成 2 条 `timeout`，是未启动查询被误记，不是两次 Tavily HTTP） |
+| 实际 specialist 调用 | **0**（`fact_check` 在 deadline 后未启动：应为 `invoked=false` / `not_invoked` / `budget.used=0` / `attempt_count=0`。当时写成 `timed_out` 是误记） |
 
-结论：总预算在 60s 内安全降级；剩余外部调用被取消；失败 specialist 明确标为 unobserved。未达到严格 ≤55.000s，按要求停止，不重复调用。
+结论：该轮真实降级有效，但计账偏高。后续修正：`query_count` 只计实际启动的 Tavily；deadline 前取消的 specialist 记未调用；产品请求在 deadline 用 Promise.race 返回，不再等待忽略 abort 的悬挂 Promise。按要求未再跑 live smoke。
 
 ---
 

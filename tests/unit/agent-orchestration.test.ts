@@ -656,6 +656,59 @@ describe("DeepSeek specialist adapter", () => {
     expect(fact?.provenance.aggregated_usage.unobserved_usage_attempts).toBe(1);
   });
 
+  test("a pre-aborted parent does not invoke specialists", async () => {
+    let calls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        calls += 1;
+        return Promise.resolve([]);
+      },
+    }));
+    const controller = new AbortController();
+    controller.abort();
+    const run = await createSpecialistOrchestrator(specialists, { nowMs: () => 0 }).orchestrate({
+      article,
+      findings: [personFinding, consistencyFinding],
+      signal: controller.signal,
+    });
+    expect(calls).toBe(0);
+    expect(run.dispatched).toEqual([]);
+    expect(run.budget.used).toBe(0);
+    expect(run.skipped.every((item) => item.reason === "deadline")).toBe(true);
+    expect(
+      run.results.every(
+        (item) =>
+          item.provenance.invoked === false &&
+          item.provenance.status === "not_invoked" &&
+          item.provenance.attempt_count === 0,
+      ),
+    ).toBe(true);
+  });
+
+  test("a specialist that ignores abort still returns when the deadline fires", async () => {
+    let calls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        calls += 1;
+        return new Promise(() => undefined);
+      },
+    }));
+    const started = Date.now();
+    const run = await createSpecialistOrchestrator(specialists, { deadlineMs: 40 }).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(calls).toBe(1);
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.provenance.invoked).toBe(true);
+    expect(fact?.provenance.status).toBe("timed_out");
+  });
+
   test("drops basic_text and quotes that are not in the current task fragments", async () => {
     const mixed: ReviewCandidate[] = [
       candidateOn("座谈谈会", "错别字", "座谈会"),

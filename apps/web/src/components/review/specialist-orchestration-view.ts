@@ -72,6 +72,7 @@ export const SPECIALIST_EVIDENCE_KIND_LABEL: Record<LlmEvidenceItem["kind"], str
 const SKIP_REASON_LABEL: Record<string, string> = {
   "call budget": "超出调用预算，未派发",
   "specialist not registered": "未注册，未派发",
+  deadline: "时间预算已用尽，未调用",
 };
 
 export type SpecialistCallView = {

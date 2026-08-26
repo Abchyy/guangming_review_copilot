@@ -65,12 +65,66 @@ export type CreateReviewOptions = {
 /** Product reviews must finish or degrade under the Next.js route cap. */
 export const PRODUCT_REVIEW_DEADLINE_MS = 55_000;
 export const PRODUCT_REVIEW_MAX_ELAPSED_MS = 60_000;
+/** Leave time to assemble the response after abort so wall clock stays ≤ deadline. */
+export const PRODUCT_REVIEW_SETTLE_MS = 400;
+
+export function productAbortAtMs(deadlineMs: number): number {
+  const settle = Math.min(PRODUCT_REVIEW_SETTLE_MS, Math.max(0, Math.trunc(deadlineMs / 4)));
+  return Math.max(0, deadlineMs - settle);
+}
 
 function remainingDeadlineMs(startedAt: number, deadlineMs: number | undefined): number | undefined {
   if (deadlineMs == null) {
     return undefined;
   }
   return Math.max(0, deadlineMs - (Date.now() - startedAt));
+}
+
+function swallowLater(work: Promise<unknown>): void {
+  void work.then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
+function raceAbort<T>(
+  work: Promise<T>,
+  signal: AbortSignal | undefined,
+  onAbort: () => T,
+): Promise<T> {
+  if (!signal) {
+    return work;
+  }
+  if (signal.aborted) {
+    swallowLater(work);
+    return Promise.resolve().then(onAbort);
+  }
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (apply: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      signal.removeEventListener("abort", abort);
+      apply();
+    };
+    const abort = () => {
+      swallowLater(work);
+      finish(() => {
+        try {
+          resolve(onAbort());
+        } catch (error) {
+          reject(error);
+        }
+      });
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    work.then(
+      (value) => finish(() => resolve(value)),
+      (error) => finish(() => reject(error)),
+    );
+  });
 }
 
 function linkReviewAbort(options: { deadlineMs?: number; signal?: AbortSignal }): {
@@ -88,10 +142,10 @@ function linkReviewAbort(options: { deadlineMs?: number; signal?: AbortSignal })
   } else {
     options.signal?.addEventListener("abort", onParentAbort, { once: true });
   }
+  const abortAt =
+    options.deadlineMs == null ? undefined : productAbortAtMs(options.deadlineMs);
   const timer =
-    options.deadlineMs != null
-      ? setTimeout(onParentAbort, Math.max(0, options.deadlineMs))
-      : undefined;
+    abortAt != null ? setTimeout(onParentAbort, abortAt) : undefined;
   return {
     signal: controller.signal,
     cleanup: () => {
@@ -182,7 +236,7 @@ async function createReviewWithSignal(
       if (signal.aborted || modelTimeoutMs === 0) {
         throw new ReviewProviderError("Review deadline exceeded");
       }
-      rawCandidates = await model.review(article, {
+      const reviewWork = model.review(article, {
         promptMode,
         ruleHits: ruleHits.map((hit) => ({
           rule_id: hit.rule_id,
@@ -198,6 +252,9 @@ async function createReviewWithSignal(
         ...(options.deadlineMs != null || options.signal
           ? { signal, timeoutMs: modelTimeoutMs }
           : {}),
+      });
+      rawCandidates = await raceAbort(reviewWork, options.deadlineMs != null || options.signal ? signal : undefined, () => {
+        throw new ReviewProviderError("Review deadline exceeded");
       });
     } catch (error) {
       const providerError =
@@ -368,8 +425,17 @@ async function collectWebEvidence(
   if (!collector) {
     return undefined;
   }
+  if (signal?.aborted) {
+    return parseWebEvidenceRun({ enabled: true, query_count: 0, results: [] });
+  }
   try {
-    return parseWebEvidenceRun(await collector.collect({ article, findings, signal }));
+    return parseWebEvidenceRun(
+      await raceAbort(collector.collect({ article, findings, signal }), signal, () => ({
+        enabled: true as const,
+        query_count: 0,
+        results: [],
+      })),
+    );
   } catch {
     return parseWebEvidenceRun({
       enabled: true,

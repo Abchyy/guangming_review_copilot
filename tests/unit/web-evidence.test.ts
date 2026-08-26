@@ -342,4 +342,20 @@ describe("web evidence fake provider and collector", () => {
     expect(run.results).toEqual([]);
     expect(recorder.queries).toEqual([]);
   });
+
+  test("an already-aborted collect does not start search requests", async () => {
+    const recorder = new RecordingProvider(
+      new FakeSearchProvider({ now: () => new Date(retrievedAt) }),
+    );
+    const controller = new AbortController();
+    controller.abort();
+    const run = await createWebEvidenceCollector(recorder).collect({
+      article,
+      findings: [findingOf("person", "市教育局局长王海涛")],
+      signal: controller.signal,
+    });
+    expect(run.query_count).toBe(0);
+    expect(run.results).toEqual([]);
+    expect(recorder.queries).toEqual([]);
+  });
 });

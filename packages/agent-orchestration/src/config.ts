@@ -19,6 +19,7 @@ export const SPECIALIST_MAX_TOKENS = 2048;
 export const SPECIALIST_MAX_ATTEMPTS = 1;
 export const SPECIALIST_SDK_MAX_RETRIES = 0;
 export const FRAGMENT_CONTEXT_CHARS = 40;
+export const SPECIALIST_DEADLINE_SKIP_REASON = "deadline";
 
 export type EnvLike = Record<string, string | undefined>;
 

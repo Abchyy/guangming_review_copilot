@@ -18,6 +18,7 @@ import {
   parseSpecialistResult,
   parseSpecialistTask,
   specialistCallTrace,
+  unobservedSpecialistCallFields,
 } from "@grc/contracts";
 
 import {
@@ -26,6 +27,7 @@ import {
   DEFAULT_SPECIALIST_MAX_CANDIDATES,
   FAKE_SPECIALIST_MODEL,
   FAKE_SPECIALIST_PROVIDER,
+  SPECIALIST_DEADLINE_SKIP_REASON,
   SPECIALIST_TARGET_MODEL,
   isSpecialistOrchestrationEnabled,
   specialistBudgetLimit,
@@ -148,12 +150,34 @@ function syntheticResult(
   });
 }
 
+function notInvokedResult(task: SpecialistTask, specialist?: Specialist): SpecialistResult {
+  const identity = identityOf(specialist);
+  return parseSpecialistResult({
+    taskId: task.taskId,
+    candidates: [],
+    provenance: {
+      taskId: task.taskId,
+      specialist: task.specialist,
+      invoked: false,
+      status: "not_invoked",
+      provider: identity.provider,
+      model: identity.model,
+      elapsedMs: 0,
+      ...unobservedSpecialistCallFields(),
+    },
+    warnings: [],
+  });
+}
+
 async function runOne(
   specialist: Specialist,
   task: SpecialistTask,
   nowMs: () => number,
   parent?: AbortSignal,
 ): Promise<SpecialistResult> {
+  if (parent?.aborted || task.constraints.deadlineMs <= 0) {
+    return notInvokedResult(task, specialist);
+  }
   const started = nowMs();
   try {
     const raw = await withDeadline(
@@ -168,10 +192,10 @@ async function runOne(
         ...parsed.provenance,
         taskId: task.taskId,
         specialist: task.specialist,
-        invoked: true,
+        invoked: parsed.provenance.invoked,
         provider: parsed.provenance.provider ?? identityOf(specialist).provider,
         model: parsed.provenance.model ?? identityOf(specialist).model,
-        elapsedMs: Math.max(0, nowMs() - started),
+        elapsedMs: parsed.provenance.invoked ? Math.max(0, nowMs() - started) : 0,
       },
     };
   } catch (error) {
@@ -235,18 +259,30 @@ export function createSpecialistOrchestrator(
           return runOne(specialist, task, nowMs, input.signal);
         }),
       );
+      const invoked = results.filter((item) => item.provenance.invoked);
+      const cancelled = results.filter((item) => !item.provenance.invoked);
       for (const result of results) {
         warnings.push(...result.warnings);
       }
-      const judgments = judgeSpecialistResults(tasks, results);
+      const skipped = [
+        ...selected.skipped,
+        ...cancelled.map((item) => ({
+          specialist: item.provenance.specialist,
+          reason: SPECIALIST_DEADLINE_SKIP_REASON,
+        })),
+      ];
+      const judgments = judgeSpecialistResults(
+        tasks.filter((task) => invoked.some((item) => item.provenance.specialist === task.specialist)),
+        invoked,
+      );
       return parseSpecialistOrchestrationRun({
         enabled: true,
         target_model: SPECIALIST_TARGET_MODEL,
-        dispatched: selected.dispatched,
-        skipped: selected.skipped,
+        dispatched: invoked.map((item) => item.provenance.specialist),
+        skipped,
         budget: {
           max_specialists: maxSpecialists,
-          used: selected.dispatched.length,
+          used: invoked.length,
         },
         results,
         judgments,
