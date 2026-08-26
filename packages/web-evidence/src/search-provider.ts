@@ -2,8 +2,8 @@ import type { WebEvidenceProviderKind, WebEvidenceQuery, WebEvidenceResult } fro
 
 /**
  * Single adapter boundary for web evidence search.
- * This stage ships only a fake offline implementation. A later live adapter
- * must implement this interface and must not be imported by review-core.
+ * Live adapters (Tavily) implement this interface and must not be imported by
+ * review-core. Fake results must never be labeled live.
  */
 export interface SearchProvider {
   readonly id: string;

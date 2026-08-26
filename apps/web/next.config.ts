@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "@grc/retrieval",
     "@grc/providers",
     "@grc/review-store",
+    "@grc/web-evidence",
   ],
   serverExternalPackages: ["openai", "better-sqlite3"],
 };

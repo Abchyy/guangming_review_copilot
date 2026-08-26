@@ -22,6 +22,7 @@ import {
 import { SearchProviderFailureError, SearchProviderTimeoutError } from "./errors";
 import { factsFromFindings, planWebEvidenceQueries } from "./query-policy";
 import type { SearchProvider } from "./search-provider";
+import { createTavilySearchProviderFromEnv, type EnvLike } from "./tavily-provider";
 
 export type WebEvidenceCollectorOptions = {
   allowlist?: DomainAllowlistByCategory;
@@ -30,7 +31,20 @@ export type WebEvidenceCollectorOptions = {
   language?: string;
   region?: string;
   now?: () => Date;
+  env?: EnvLike;
 };
+
+export function createWebEvidenceCollectorFromEnv(
+  options: WebEvidenceCollectorOptions = {},
+): WebEvidenceCollector | null {
+  const provider = createTavilySearchProviderFromEnv(options.env, {
+    now: options.now,
+  });
+  if (!provider) {
+    return null;
+  }
+  return createWebEvidenceCollector(provider, options);
+}
 
 export function createWebEvidenceCollector(
   provider: SearchProvider,
@@ -100,7 +114,7 @@ function sanitizeProviderResult(
       message: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
       provenance: {
         ...raw.provenance,
-        live_network: false,
+        live_network: provider.kind === "live" ? raw.provenance.live_network : false,
         query_text: query.query_text,
         fact_category: query.fact_category,
       },
@@ -110,7 +124,9 @@ function sanitizeProviderResult(
     .filter((item) => isAllowedWebEvidenceUrl(item.url, query.allowed_domains))
     .slice(0, query.max_results);
   if (evidence.length === 0) {
-    return unverifiedResult(provider, query, "not_found", now);
+    return unverifiedResult(provider, query, "not_found", now, {
+      liveNetwork: provider.kind === "live",
+    });
   }
   return parseWebEvidenceResult({
     ...raw,
@@ -142,7 +158,9 @@ function unverifiedResult(
   query: WebEvidenceQuery,
   errorClass: WebEvidenceErrorClass,
   now: () => Date,
+  options: { liveNetwork?: boolean } = {},
 ): WebEvidenceResult {
+  const liveSuccess = provider.kind === "live" && options.liveNetwork === true;
   return parseWebEvidenceResult({
     evidence: [],
     status: "unverified",
@@ -150,8 +168,8 @@ function unverifiedResult(
     message: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
     provenance: {
       provider_id: provider.id,
-      provider_kind: provider.kind === "live" ? "unavailable" : provider.kind,
-      live_network: false,
+      provider_kind: liveSuccess ? "live" : provider.kind === "live" ? "unavailable" : provider.kind,
+      live_network: liveSuccess,
       retrieved_at: now().toISOString(),
       query_text: query.query_text,
       fact_category: query.fact_category,

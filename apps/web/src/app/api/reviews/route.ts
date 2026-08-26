@@ -3,11 +3,13 @@ import {
   ReviewProviderError,
   ReviewRequestError,
   createReviewRequestSchema,
+  type WebEvidenceCollector,
 } from "@grc/contracts";
 import { createReviewModelFromEnv, LlmCandidateCache } from "@grc/providers";
 import type { ReviewModel } from "@grc/providers";
 import { createReview } from "@grc/review-core";
 import { ReviewStore, getReviewDatabase } from "@grc/review-store";
+import { createWebEvidenceCollectorFromEnv } from "@grc/web-evidence";
 import { getReviewStore } from "@/lib/server/store-singleton";
 
 export const maxDuration = 60;
@@ -28,9 +30,14 @@ function errorResponse(error: unknown): Response {
   return Response.json({ error: "Internal review error" }, { status: 500 });
 }
 
+export type ReviewPostHandlerOptions = {
+  webEvidenceCollector?: WebEvidenceCollector | null;
+};
+
 export function createReviewPostHandler(
   model: ReviewModel,
   store: ReviewStore = getReviewStore(),
+  options: ReviewPostHandlerOptions = {},
 ) {
   return async function POST(request: Request): Promise<Response> {
     let json: unknown;
@@ -58,6 +65,7 @@ export function createReviewPostHandler(
           model.provider !== "fixture"
             ? new LlmCandidateCache(getReviewDatabase())
             : null,
+        webEvidenceCollector: options.webEvidenceCollector ?? null,
       });
       store.insertCreatedReview(result, {
         title: result.article.title,
@@ -71,5 +79,7 @@ export function createReviewPostHandler(
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return createReviewPostHandler(createReviewModelFromEnv())(request);
+  return createReviewPostHandler(createReviewModelFromEnv(), getReviewStore(), {
+    webEvidenceCollector: createWebEvidenceCollectorFromEnv(),
+  })(request);
 }
