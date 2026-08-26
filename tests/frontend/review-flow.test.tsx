@@ -8,7 +8,16 @@ import {
   REVIEW_COMPACT_MEDIA_QUERY,
 } from "@/components/review/DesktopReviewLayout";
 import { ReviewApp } from "@/components/review/ReviewApp";
-import type { CreateReviewResponse, Finding } from "@grc/contracts";
+import type {
+  CreateReviewResponse,
+  Finding,
+  WebEvidenceResult,
+  WebEvidenceRun,
+} from "@grc/contracts";
+import {
+  WEB_EVIDENCE_RETRIEVED_MESSAGE,
+  WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+} from "@grc/contracts";
 
 const articleBody = "第一段有错别字座谈谈会。\n\n第二段写王强在总结时强调。";
 
@@ -72,6 +81,74 @@ const review: CreateReviewResponse = {
     elapsed_ms: 1,
   },
 };
+
+const retrievedAt = "2026-08-26T08:00:00.000Z";
+
+function retrievedEvidence(overrides?: Partial<WebEvidenceResult>): WebEvidenceResult {
+  return {
+    evidence: [
+      {
+        source_name: "中国政府网",
+        url: "https://www.gov.cn/example/wanghaitao",
+        title: "市教育局局长王海涛出席基础教育座谈会",
+        excerpt: "市教育局党委书记、局长王海涛出席会议并讲话。",
+        published_or_version_date: "2026-01-15",
+        retrieved_at: retrievedAt,
+        source_tier: "official",
+      },
+    ],
+    status: "retrieved",
+    error_class: "none",
+    message: WEB_EVIDENCE_RETRIEVED_MESSAGE,
+    provenance: {
+      provider_id: "fake-offline",
+      provider_kind: "fake_offline",
+      live_network: false,
+      retrieved_at: retrievedAt,
+      query_text: "市教育局局长王海涛",
+      fact_category: "person_title",
+    },
+    ...overrides,
+  };
+}
+
+function unverifiedEvidence(overrides?: Partial<WebEvidenceResult>): WebEvidenceResult {
+  return {
+    evidence: [],
+    status: "unverified",
+    error_class: "not_found",
+    message: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    provenance: {
+      provider_id: "fake-offline",
+      provider_kind: "fake_offline",
+      live_network: false,
+      retrieved_at: retrievedAt,
+      query_text: "义务教育阶段在校生",
+      fact_category: "number",
+    },
+    ...overrides,
+  };
+}
+
+function withWebEvidence(
+  results: WebEvidenceResult[],
+  extras?: Partial<CreateReviewResponse>,
+): CreateReviewResponse {
+  const run: WebEvidenceRun = {
+    enabled: true,
+    query_count: results.length,
+    results,
+  };
+  return {
+    ...review,
+    ...extras,
+    pipeline: {
+      ...review.pipeline,
+      ...extras?.pipeline,
+      web_evidence: run,
+    },
+  };
+}
 
 function Harness({ initial = review }: { initial?: CreateReviewResponse }) {
   const [current, setCurrent] = useState(initial);
@@ -464,6 +541,160 @@ describe("compact review sheet accessibility", () => {
     await user.click(accept);
     expect(fetch).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("web evidence presentation", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(false);
+  });
+
+  test("does not render a panel when the pipeline omitted web evidence", () => {
+    render(<Harness />);
+    expect(screen.queryByTestId("web-evidence-panel")).toBeNull();
+    expect(screen.queryByTestId("web-evidence-banner")).toBeNull();
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+  });
+
+  test("retrieved evidence shows status, source, title, url, excerpt, date, and tier", () => {
+    render(<Harness initial={withWebEvidence([retrievedEvidence()])} />);
+    const panel = screen.getByTestId("web-evidence-panel");
+    expect(panel.textContent).toContain("已返回网页证据");
+    expect(panel.textContent).toContain(WEB_EVIDENCE_RETRIEVED_MESSAGE);
+    expect(panel.textContent).toContain("中国政府网");
+    expect(panel.textContent).toContain("市教育局局长王海涛出席基础教育座谈会");
+    expect(panel.textContent).toContain("市教育局党委书记、局长王海涛出席会议并讲话。");
+    expect(panel.textContent).toContain("2026-01-15");
+    expect(panel.textContent).toContain("官方");
+    expect(panel.textContent).toContain("来源名称");
+    expect(panel.textContent).toContain("标题");
+    expect(panel.textContent).toContain("URL");
+    expect(panel.textContent).toContain("短摘录");
+    expect(panel.textContent).toContain("日期");
+    expect(panel.textContent).toContain("来源等级");
+    expect(panel.querySelector("a")?.getAttribute("href")).toBe(
+      "https://www.gov.cn/example/wanghaitao",
+    );
+    expect(screen.queryByTestId("web-evidence-banner")).toBeNull();
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+  });
+
+  test("unverified evidence is explicit and is not presented as 没有问题", () => {
+    render(<Harness initial={withWebEvidence([unverifiedEvidence()])} />);
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      "不表示稿件没有问题",
+    );
+    expect(screen.getByTestId("web-evidence-status").textContent).toBe(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+    expect(screen.getByTestId("web-evidence-unverified-0").textContent).toContain(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+    expect(screen.getByTestId("web-evidence-panel").textContent).not.toContain("没有问题");
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+    expect(screen.getByTestId("finding-finding-001").textContent).toContain("测试依据");
+  });
+
+  test("empty findings with unverified evidence do not look like a clean bill", () => {
+    render(
+      <Harness
+        initial={withWebEvidence([unverifiedEvidence()], {
+          findings: [],
+          pipeline: { ...review.pipeline, located_count: 0 },
+        })}
+      />,
+    );
+    expect(screen.getByTestId("article-body").textContent).toContain("第一段有错别字座谈谈会。");
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+    expect(screen.getByTestId("finding-empty").textContent).toContain("本轮无正文批注");
+    expect(screen.getByTestId("finding-empty").textContent).toContain("不能视为没有问题");
+    expect(screen.getByTestId("finding-empty").textContent).not.toContain(
+      "未发现需要提示的问题",
+    );
+  });
+
+  test("missing date is labeled instead of dropped", () => {
+    const missingDate = retrievedEvidence({
+      evidence: [
+        {
+          source_name: "新华网",
+          url: "https://www.news.cn/example/wanghaitao",
+          title: "王海涛：抓好开学工作",
+          excerpt: "王海涛要求各地做好开学准备。",
+          published_or_version_date: null,
+          retrieved_at: retrievedAt,
+          source_tier: "authoritative",
+        },
+      ],
+    });
+    render(<Harness initial={withWebEvidence([missingDate])} />);
+    const item = screen.getByTestId("web-evidence-item-0-0");
+    expect(item.textContent).toContain("日期未标明");
+    expect(item.textContent).toContain("权威");
+    expect(item.textContent).toContain("新华网");
+  });
+
+  test("reading mode, filters, and the findings sheet still work with web evidence", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={withWebEvidence([retrievedEvidence(), unverifiedEvidence()])} />);
+    expect(screen.getAllByTestId("source-mark").length).toBeGreaterThan(0);
+    await user.click(screen.getByTestId("reading-mode-toggle"));
+    expect(screen.queryAllByTestId("source-mark")).toHaveLength(0);
+    expect(screen.getByTestId("web-evidence-panel")).toBeTruthy();
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+
+    await user.selectOptions(screen.getByTestId("severity-filter"), "critical");
+    expect(screen.queryByTestId("finding-finding-001")).toBeNull();
+    expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
+    expect(screen.getByTestId("web-evidence-panel")).toBeTruthy();
+    expect(screen.getByTestId("findings-sheet")).toBeTruthy();
+    expect(screen.getByTestId("findings-sheet-toggle")).toBeTruthy();
+  });
+});
+
+describe("compact web evidence sheet", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(true);
+  });
+
+  test("collapsed compact sheet keeps unverified status visible without exposing details", async () => {
+    render(<Harness initial={withWebEvidence([unverifiedEvidence()])} />);
+    await waitForCompactLayout();
+    const toggle = screen.getByTestId("findings-sheet-toggle");
+    const panel = screen.getByTestId("findings-sheet-panel");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toContain(WEB_EVIDENCE_UNVERIFIED_MESSAGE);
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+    expect(panel.hidden).toBe(true);
+    expect(panel.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+  });
+
+  test("expanding the compact sheet reveals evidence fields and keeps filters", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={withWebEvidence([retrievedEvidence()])} />);
+    await waitForCompactLayout();
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(false);
+    expect(screen.getByTestId("web-evidence-panel").textContent).toContain("中国政府网");
+    expect(screen.getByTestId("web-evidence-panel").textContent).toContain("来源等级");
+    expect(screen.getByRole("link").getAttribute("href")).toBe(
+      "https://www.gov.cn/example/wanghaitao",
+    );
+    expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
   });
 });
 

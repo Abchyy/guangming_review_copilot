@@ -12,6 +12,9 @@ type FindingListProps = {
   selectedFindingId: string | null;
   pendingActionFindingId: string | null;
   revealNonce?: number;
+  emptyTitle?: string;
+  emptyDetail?: string;
+  emptyCaution?: boolean;
   onSelectFinding: (findingId: string) => void;
   onDecide: (findingId: string, action: FindingAction) => void;
 };
@@ -60,6 +63,9 @@ export function FindingList({
   selectedFindingId,
   pendingActionFindingId,
   revealNonce = 0,
+  emptyTitle = "未发现需要提示的问题",
+  emptyDetail = "稿件已通过本轮自动审校，仍建议人工通读一遍。",
+  emptyCaution = false,
   onSelectFinding,
   onDecide,
 }: FindingListProps) {
@@ -103,10 +109,13 @@ export function FindingList({
 
   if (findings.length === 0) {
     return (
-      <div data-testid="finding-empty" className="finding-empty">
-        <IconSealCheck />
-        <strong>未发现需要提示的问题</strong>
-        稿件已通过本轮自动审校，仍建议人工通读一遍。
+      <div
+        data-testid="finding-empty"
+        className={`finding-empty${emptyCaution ? " is-caution" : ""}`}
+      >
+        {emptyCaution ? <IconAlert /> : <IconSealCheck />}
+        <strong>{emptyTitle}</strong>
+        {emptyDetail}
       </div>
     );
   }
