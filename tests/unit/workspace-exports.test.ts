@@ -19,6 +19,7 @@ const PACKAGES = [
   "@grc/holdout-protocol",
   "@grc/test-kit",
   "@grc/web-evidence",
+  "@grc/agent-orchestration",
 ] as const;
 
 describe("workspace package exports", () => {

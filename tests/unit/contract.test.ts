@@ -4,6 +4,9 @@ import {
   llmReviewOutputSchema,
   parseLlmReviewOutput,
   ReviewProviderError,
+  MODEL_SPECIALIST_IDS,
+  SPECIALIST_MAX_PER_ARTICLE,
+  specialistOrchestrationRunSchema,
   specialistResultSchema,
   specialistTaskSchema,
   sourceCandidateSchema,
@@ -184,6 +187,87 @@ describe("MA-0 specialist contracts", () => {
     });
     expect(parsed.candidates).toHaveLength(1);
     expect(parsed.provenance.status).toBe("succeeded");
+  });
+
+  test("accepts fact_check and news_edit fragment tasks without the full article", () => {
+    expect(MODEL_SPECIALIST_IDS).toEqual(["fact_check", "news_edit"]);
+    expect(SPECIALIST_MAX_PER_ARTICLE).toBe(2);
+    const parsed = specialistTaskSchema.parse({
+      taskId: "fact_check:1",
+      specialist: "fact_check",
+      fragments: [
+        {
+          field: "body",
+          start_offset: 4,
+          end_offset: 8,
+          quoted_text: "政策名称",
+          paragraph_index: 0,
+          article_version: 1,
+          context_before: "正文含有",
+          context_after: "。",
+        },
+      ],
+      preliminaryFindings: [
+        {
+          type: "policy",
+          severity: "high",
+          title: "政策名称待核验",
+          reason: "政策名称可能不是规范全称。",
+          source_span: sourceSpan,
+          confidence: 0.6,
+        },
+      ],
+      candidateSpans: [sourceSpan],
+      retrievedEvidence: [],
+      constraints: {
+        maxCandidates: 5,
+        deadlineMs: 2_000,
+        allowExternalRetrieval: false,
+      },
+    });
+    expect(parsed.article).toBeUndefined();
+    expect(parsed.fragments).toHaveLength(1);
+    expect(parsed.preliminaryFindings[0]?.type).toBe("policy");
+  });
+
+  test("accepts an orchestration run with verify judgments", () => {
+    const parsed = specialistOrchestrationRunSchema.parse({
+      enabled: true,
+      target_model: "deepseek-v4-flash",
+      dispatched: ["fact_check", "news_edit"],
+      skipped: [],
+      budget: { max_specialists: 2, used: 2 },
+      results: [
+        {
+          taskId: "fact_check:1",
+          candidates: [validCandidate],
+          provenance: {
+            taskId: "fact_check:1",
+            specialist: "fact_check",
+            invoked: true,
+            status: "succeeded",
+            provider: "fixture",
+            model: "fake-specialist",
+            elapsedMs: 1,
+          },
+          warnings: [],
+        },
+      ],
+      judgments: [
+        {
+          field: "body",
+          paragraph_index: 0,
+          quoted_text: "政策名称",
+          decision: "verify",
+          reason: "专家结论存在分歧，待人工核实",
+          specialist_ids: ["fact_check", "news_edit"],
+          requires_verification: true,
+        },
+      ],
+      warnings: [],
+    });
+    expect(parsed.judgments[0]?.decision).toBe("verify");
+    expect(parsed.budget.max_specialists).toBe(2);
   });
 });
 

@@ -58,6 +58,9 @@
       ],
       "@grc/web-evidence": [
         "./packages/web-evidence/src/index.ts"
+      ],
+      "@grc/agent-orchestration": [
+        "./packages/agent-orchestration/src/index.ts"
       ]
     }
   },
