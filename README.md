@@ -77,6 +77,7 @@ import { createReview } from "@grc/review-core";
 | `@grc/review-core` | 规范化、融合、排序、pipeline | Next、React、SQLite、benchmark |
 | `@grc/rules-engine` | 规则目录与确定性规则 | Next、review-core、holdout |
 | `@grc/retrieval` | Retriever / 语料检索 | Next、review-core、向量库 |
+| `@grc/web-evidence` | 轻量联网核验（Query Policy + SearchProvider） | 真实搜索、RAG、向量库、前端 |
 | `@grc/providers` | Fixture / DeepSeek / OpenAI adapter | 业务规则、DB 写入、holdout |
 | `@grc/review-store` | 状态机 + SQLite adapter | Next、review-core、benchmark |
 | `@grc/benchmark` | 开发集评估器 | 不得反向写入 prompt/rules/corpus |
@@ -106,6 +107,7 @@ npm run test:protocol
 
 - **新增 rule**：在 `data/rules/catalog.json` 增加条目，于 `packages/rules-engine` 实现匹配逻辑，补 `npm run test:rules`。
 - **新增 retriever**：实现 `Retriever`（`retrieve(query: RetrievalQuery): RetrievedEvidence[]`），在 pipeline 中显式注入；不要在 retrieval 包里直接产出最终 Finding。
+- **新增 Web Evidence provider**：实现 `SearchProvider`（`@grc/web-evidence`）。当前只有离线 `FakeSearchProvider`，不得接入真实搜索、不得发网络请求、不得把 fake 结果标成 live。Query Policy 与按类别配置的域名白名单在 `web-evidence` 包内，`review-core` 只接受可选的 `WebEvidenceCollector`。
 - **新增 provider**：实现 `ReviewModel`，只负责模型 I/O 与 provenance，不写规则/排序/数据库。
 - **新增 specialist（默认不启用）**：只实现 `Specialist` / `SpecialistTask` / `SpecialistResult` 契约。`pipeline.specialists_enabled` 必须保持 `false`，产品运行时不得调用 specialist。
 

@@ -1,10 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "光明审校 Copilot",
   description: "面向严肃媒体责任编辑的轻量化 AI 审校工具",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#b02e24",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

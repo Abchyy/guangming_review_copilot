@@ -1,16 +1,20 @@
 import {
   BODY_MAX_LENGTH,
   TITLE_MAX_LENGTH,
+  WEB_EVIDENCE_UNVERIFIED_MESSAGE,
   createReviewResponseSchema,
   ReviewProviderError,
   ReviewRequestError,
   findingSchema,
   parseLlmReviewOutput,
+  parseWebEvidenceRun,
   type CanonicalArticle,
   type CreateReviewRequest,
   type CreateReviewResponse,
   type Finding,
   type ReviewCandidate,
+  type WebEvidenceCollector,
+  type WebEvidenceRun,
 } from "@grc/contracts";
 import { canonicalizeArticle } from "./normalization";
 import type { ReviewModel, ReviewPromptMode } from "@grc/providers";
@@ -40,6 +44,8 @@ export type CreateReviewOptions = {
   cache?: LlmCandidateCache | null;
   disableRules?: boolean;
   disableRetrieval?: boolean;
+  /** Optional Web Evidence collector. Default off; review-core never calls a search vendor. */
+  webEvidenceCollector?: WebEvidenceCollector | null;
 };
 
 
@@ -221,6 +227,12 @@ export async function createReview(
     }),
   );
 
+  const webEvidence = await collectWebEvidence(
+    options.webEvidenceCollector,
+    article,
+    findings,
+  );
+
   const response: CreateReviewResponse = {
     review_id: crypto.randomUUID(),
     article,
@@ -235,10 +247,45 @@ export async function createReview(
       provenance,
       fallback,
       specialists_enabled: false,
+      ...(webEvidence ? { web_evidence: webEvidence } : {}),
     },
   };
 
   return createReviewResponseSchema.parse(response);
+}
+
+async function collectWebEvidence(
+  collector: WebEvidenceCollector | null | undefined,
+  article: CanonicalArticle,
+  findings: Finding[],
+): Promise<WebEvidenceRun | undefined> {
+  if (!collector) {
+    return undefined;
+  }
+  try {
+    return parseWebEvidenceRun(await collector.collect({ article, findings }));
+  } catch {
+    return parseWebEvidenceRun({
+      enabled: true,
+      query_count: 0,
+      results: [
+        {
+          evidence: [],
+          status: "unverified",
+          error_class: "provider_failure",
+          message: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+          provenance: {
+            provider_id: "web-evidence-collector",
+            provider_kind: "unavailable",
+            live_network: false,
+            retrieved_at: new Date().toISOString(),
+            query_text: "",
+            fact_category: null,
+          },
+        },
+      ],
+    });
+  }
 }
 
 function validateRequest(input: CreateReviewRequest): void {

@@ -6,6 +6,7 @@ import demoArticle from "../../../../../data/fixtures/demo-article.json";
 import type { CreateReviewResponse } from "@grc/contracts";
 import { createReviewResponseSchema } from "@grc/contracts";
 import { DesktopReviewLayout } from "@/components/review/DesktopReviewLayout";
+import { Masthead } from "@/components/review/Masthead";
 
 export function ReviewApp() {
   const [title, setTitle] = useState(demoArticle.title);
@@ -55,52 +56,80 @@ export function ReviewApp() {
   return (
     <div className="input-shell" data-testid="article-input">
       <header className="review-header">
-        <div>
-          <p className="eyebrow">Guangming Review Copilot</p>
-          <h1>光明审校 Copilot</h1>
-          <p className="lede">粘贴标题与正文，开始一次桌面审校工作流。</p>
-        </div>
+        <Masthead />
       </header>
-      <form
-        className="input-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void startReview();
-        }}
-      >
-        <label className="field">
-          <span>标题</span>
-          <input
-            data-testid="title-input"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            required
-          />
-        </label>
-        <label className="field">
-          <span>正文</span>
-          <textarea
-            data-testid="body-input"
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            required
-            rows={18}
-          />
-        </label>
-        {error ? (
-          <p className="form-error" data-testid="review-error">
-            {error}
-          </p>
-        ) : null}
-        <button
-          type="submit"
-          data-testid="start-review"
-          className="primary-button"
-          disabled={loading}
+      <main className="input-main">
+        <form
+          className="input-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void startReview();
+          }}
         >
-          {loading ? "审校中…" : "开始审校"}
-        </button>
-      </form>
+          <div className="input-intro">
+            <h1>稿件审校台</h1>
+            <p>
+              粘贴标题与正文，系统将结合文字规范、文内一致性与权威语料给出审校意见。
+              审校结论仅供编辑参考，最终由人工确认。
+            </p>
+          </div>
+          <label className="field">
+            <span className="field-label">
+              标题<em>必填</em>
+            </span>
+            <input
+              data-testid="title-input"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              disabled={loading}
+              required
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">
+              正文<em>必填</em>
+              <span className="field-count" data-testid="body-count">
+                {body.length} 字
+              </span>
+            </span>
+            <textarea
+              data-testid="body-input"
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              disabled={loading}
+              required
+              rows={14}
+            />
+          </label>
+          {error ? (
+            <p className="form-error" role="alert" data-testid="review-error">
+              {error}
+            </p>
+          ) : null}
+          <div className="form-footer">
+            <p className="form-hint">
+              {loading
+                ? "正在比对文字规范与权威语料，通常需要数秒…"
+                : "支持消息稿、通讯、评论等中文新闻体裁。"}
+            </p>
+            <button
+              type="submit"
+              data-testid="start-review"
+              className="primary-button"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="button-spinner" aria-hidden="true" />
+                  审校中…
+                </>
+              ) : (
+                "开始审校"
+              )}
+            </button>
+          </div>
+        </form>
+      </main>
     </div>
   );
 }

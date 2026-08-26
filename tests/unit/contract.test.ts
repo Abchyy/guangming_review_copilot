@@ -7,6 +7,10 @@ import {
   specialistResultSchema,
   specialistTaskSchema,
   sourceCandidateSchema,
+  WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+  parseWebEvidenceResult,
+  webEvidenceQuerySchema,
+  webEvidenceResultSchema,
 } from "@grc/contracts";
 
 const validCandidate = {
@@ -180,5 +184,85 @@ describe("MA-0 specialist contracts", () => {
     });
     expect(parsed.candidates).toHaveLength(1);
     expect(parsed.provenance.status).toBe("succeeded");
+  });
+});
+
+describe("web evidence contracts", () => {
+  const retrievedAt = "2026-08-26T00:00:00.000Z";
+
+  test("accepts a serializable query, item, and retrieved result", () => {
+    const query = webEvidenceQuerySchema.parse({
+      query_text: "市教育局局长王海涛",
+      fact_category: "person_title",
+      allowed_domains: ["gov.cn"],
+      language: "zh-CN",
+      region: "CN",
+      max_results: 3,
+    });
+    expect(query.max_results).toBe(3);
+
+    const result = parseWebEvidenceResult({
+      evidence: [
+        {
+          source_name: "中国政府网",
+          url: "https://www.gov.cn/example",
+          title: "人物职务",
+          excerpt: "市教育局局长王海涛出席。",
+          published_or_version_date: "2026-01-01",
+          retrieved_at: retrievedAt,
+          source_tier: "official",
+        },
+      ],
+      status: "retrieved",
+      error_class: "none",
+      message: "已返回可追溯网页证据，仅供审校判断，不构成外部核验结论",
+      provenance: {
+        provider_id: "fake-offline",
+        provider_kind: "fake_offline",
+        live_network: false,
+        retrieved_at: retrievedAt,
+        query_text: query.query_text,
+        fact_category: "person_title",
+      },
+    });
+    expect(result.evidence[0]?.url).toContain("gov.cn");
+  });
+
+  test("rejects fake offline provenance that claims a live network", () => {
+    expect(
+      webEvidenceResultSchema.safeParse({
+        evidence: [],
+        status: "unverified",
+        error_class: "not_found",
+        message: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+        provenance: {
+          provider_id: "fake-offline",
+          provider_kind: "fake_offline",
+          live_network: true,
+          retrieved_at: retrievedAt,
+          query_text: "市教育局局长王海涛",
+          fact_category: "person_title",
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  test("unverified results must use the canonical message and cannot look like a clean bill", () => {
+    expect(
+      webEvidenceResultSchema.safeParse({
+        evidence: [],
+        status: "unverified",
+        error_class: "not_found",
+        message: "没有问题",
+        provenance: {
+          provider_id: "fake-offline",
+          provider_kind: "fake_offline",
+          live_network: false,
+          retrieved_at: retrievedAt,
+          query_text: "市教育局局长王海涛",
+          fact_category: "person_title",
+        },
+      }).success,
+    ).toBe(false);
   });
 });

@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { DesktopReviewLayout } from "@/components/review/DesktopReviewLayout";
+import {
+  DesktopReviewLayout,
+  REVIEW_COMPACT_MEDIA_QUERY,
+} from "@/components/review/DesktopReviewLayout";
+import { ReviewApp } from "@/components/review/ReviewApp";
 import type { CreateReviewResponse, Finding } from "@grc/contracts";
 
 const articleBody = "第一段有错别字座谈谈会。\n\n第二段写王强在总结时强调。";
@@ -80,9 +84,32 @@ function Harness({ initial = review }: { initial?: CreateReviewResponse }) {
   );
 }
 
+function createMatchMedia(compact: boolean): typeof window.matchMedia {
+  return (query: string) =>
+    ({
+      matches: query === REVIEW_COMPACT_MEDIA_QUERY ? compact : false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
+async function waitForCompactLayout() {
+  await vi.waitFor(() => {
+    expect(screen.getByTestId("desktop-review").getAttribute("data-compact")).toBe(
+      "true",
+    );
+  });
+}
+
 describe("desktop vertical slice mapping", () => {
   beforeEach(() => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(false);
   });
 
   test("renders the full article and finding highlights", () => {
@@ -93,7 +120,7 @@ describe("desktop vertical slice mapping", () => {
     expect(screen.getAllByTestId("source-mark").length).toBeGreaterThan(0);
     expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
     expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
-    expect(screen.getByTestId("finding-finding-002").textContent).toContain("Critical");
+    expect(screen.getByTestId("finding-finding-002").textContent).toContain("严重");
     expect(screen.getByTestId("finding-finding-001").textContent).toContain("测试依据");
   });
 
@@ -109,10 +136,10 @@ describe("desktop vertical slice mapping", () => {
     expect(screen.getByTestId("desktop-review").className).toContain("is-sheet-open");
   });
 
-  test("clicking a finding scrolls to and emphasizes the source span", async () => {
+  test("clicking a finding locate button scrolls to and emphasizes the source span", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(screen.getByTestId("finding-finding-002"));
+    await user.click(screen.getByTestId("locate-finding-002"));
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
     const mark = screen
       .getAllByTestId("source-mark")
@@ -138,6 +165,7 @@ describe("desktop review workflow", () => {
   beforeEach(() => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.restoreAllMocks();
+    window.matchMedia = createMatchMedia(false);
   });
 
   test("null replacement disables Accept", () => {
@@ -191,6 +219,7 @@ describe("desktop review workflow", () => {
     expect(screen.getByTestId("article-body").textContent).toContain("座谈会");
     expect(screen.getByTestId("finding-finding-001").textContent).toContain("已接受");
     expect(screen.getByTestId("finding-finding-002").className).toContain("is-selected");
+    expect(screen.getByTestId("action-toast").textContent).toContain("已接受");
   });
 
   test("Ignore and Verify show status without mutating article", async () => {
@@ -257,6 +286,7 @@ describe("desktop review workflow", () => {
 describe("P0 reading mode, filters, evidence, fallback, and mobile sheet", () => {
   beforeEach(() => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(false);
   });
 
   test("reading mode hides source marks", async () => {
@@ -326,5 +356,139 @@ describe("P0 reading mode, filters, evidence, fallback, and mobile sheet", () =>
     expect(screen.getByTestId("fallback-banner").textContent).toContain("规则结果");
     expect(screen.getByTestId("findings-sheet")).toBeTruthy();
     expect(screen.getByTestId("findings-sheet-toggle")).toBeTruthy();
+  });
+
+  test("sheet toggle expands and collapses the findings sheet", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const shell = screen.getByTestId("desktop-review");
+    expect(shell.className).toContain("is-sheet-collapsed");
+    expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(false);
+    expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    expect(shell.className).toContain("is-sheet-open");
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    expect(shell.className).toContain("is-sheet-collapsed");
+    expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
+  });
+});
+
+describe("compact review sheet accessibility", () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.matchMedia = createMatchMedia(true);
+  });
+
+  test("collapsed compact sheet only exposes the summary toggle", async () => {
+    render(<Harness />);
+    await waitForCompactLayout();
+    const toggle = screen.getByTestId("findings-sheet-toggle");
+    const panel = screen.getByTestId("findings-sheet-panel");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toContain("展开");
+    expect(panel.hidden).toBe(true);
+    expect(panel.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "类型" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "接受" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "忽略" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "待核实" })).toBeNull();
+    expect(screen.getByRole("button", { name: /审校意见 · 待处理/ })).toBeTruthy();
+  });
+
+  test("expanding the compact sheet restores filters, findings, and actions", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await waitForCompactLayout();
+    await user.click(screen.getByTestId("findings-sheet-toggle"));
+    const toggle = screen.getByTestId("findings-sheet-toggle");
+    const panel = screen.getByTestId("findings-sheet-panel");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.textContent).toContain("收起");
+    expect(panel.hidden).toBe(false);
+    expect(panel.hasAttribute("inert")).toBe(false);
+    expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "类型" })).toBeTruthy();
+    expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "接受" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "忽略" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "待核实" }).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("finding-finding-001").textContent).toContain("测试依据");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "风险" }), "critical");
+    expect(screen.queryByTestId("finding-finding-001")).toBeNull();
+    expect(screen.getByTestId("finding-finding-002")).toBeTruthy();
+
+    await user.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(panel.hidden).toBe(true);
+    expect(panel.hasAttribute("inert")).toBe(true);
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "接受" })).toBeNull();
+  });
+
+  test("selecting a mark in compact layout opens the sheet and locates the finding", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await waitForCompactLayout();
+    const mark = screen
+      .getAllByTestId("source-mark")
+      .find((element) => element.getAttribute("data-primary-finding-id") === "finding-001");
+    expect(mark).toBeTruthy();
+    await user.click(mark!);
+    expect(screen.getByTestId("findings-sheet-toggle").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(false);
+    expect(screen.getByTestId("finding-finding-001").className).toContain("is-selected");
+    expect(screen.getAllByRole("button", { name: "接受" }).length).toBeGreaterThan(0);
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  test("collapsed compact findings cannot take pointer or keyboard focus", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await waitForCompactLayout();
+    const panel = screen.getByTestId("findings-sheet-panel");
+    const accept = screen.getByTestId("accept-finding-001");
+    const filter = screen.getByTestId("severity-filter");
+    expect(accept.closest("[hidden]")).toBe(panel);
+    expect(filter.closest("[inert]")).toBe(panel);
+    expect(screen.queryByRole("button", { name: "接受" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+    screen.getByTestId("findings-sheet-toggle").focus();
+    await user.tab();
+    expect(document.activeElement).not.toBe(accept);
+    expect(document.activeElement).not.toBe(filter);
+    vi.stubGlobal("fetch", vi.fn());
+    await user.click(accept);
+    expect(fetch).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("article input page", () => {
+  test("renders masthead, char count, and submit affordance", () => {
+    render(<ReviewApp />);
+    expect(screen.getByTestId("article-input")).toBeTruthy();
+    expect(screen.getByTestId("body-count").textContent).toMatch(/\d+ 字/);
+    expect(screen.getByTestId("start-review").textContent).toContain("开始审校");
+  });
+
+  test("shows loading state and error banner on failure", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: "审校服务暂不可用" }),
+      }),
+    );
+    render(<ReviewApp />);
+    await user.click(screen.getByTestId("start-review"));
+    expect((await screen.findByTestId("review-error")).textContent).toContain(
+      "审校服务暂不可用",
+    );
+    vi.unstubAllGlobals();
   });
 });

@@ -30,12 +30,13 @@ function importsOf(file: string): string[] {
 }
 
 const FORBIDDEN: Record<string, string[]> = {
-  contracts: ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "next", "react", "better-sqlite3"],
-  "review-core": ["next", "react", "better-sqlite3", "@grc/benchmark", "@grc/holdout-protocol", "@grc/review-store"],
+  contracts: ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "@grc/web-evidence", "next", "react", "better-sqlite3"],
+  "review-core": ["next", "react", "better-sqlite3", "@grc/benchmark", "@grc/holdout-protocol", "@grc/review-store", "@grc/web-evidence"],
   "rules-engine": ["@grc/review-core", "@grc/holdout-protocol", "@grc/benchmark", "next", "react"],
   retrieval: ["@grc/review-core", "@grc/holdout-protocol", "@grc/benchmark", "next", "react"],
   providers: ["@grc/rules-engine", "@grc/review-core", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol"],
   "review-store": ["@grc/review-core", "@grc/benchmark", "@grc/holdout-protocol", "next", "react"],
+  "web-evidence": ["@grc/review-core", "@grc/rules-engine", "@grc/retrieval", "@grc/providers", "@grc/review-store", "@grc/benchmark", "@grc/holdout-protocol", "next", "react", "better-sqlite3"],
   web: ["@grc/benchmark", "@grc/holdout-protocol", "@grc/test-kit"],
 };
 

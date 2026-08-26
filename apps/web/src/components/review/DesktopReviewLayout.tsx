@@ -1,17 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { CreateReviewResponse, FindingAction } from "@grc/contracts";
-import { createReviewResponseSchema } from "@grc/contracts";
+import { createReviewResponseSchema, isUnresolvedStatus } from "@grc/contracts";
 import { ArticleDocument } from "@/components/review/ArticleDocument";
 import { FindingList } from "@/components/review/FindingList";
+import { Masthead } from "@/components/review/Masthead";
+import { IconAlert, IconBook, IconCheck, IconRefresh } from "@/components/review/icons";
 import { selectAfterDecision, unresolvedFindings } from "@/lib/review-selection";
+
+/** Keep in sync with `@media (max-width: 1023px)` in globals.css. */
+export const REVIEW_COMPACT_MEDIA_QUERY = "(max-width: 1023px)";
+
+function blockHiddenSheetEvents(event: { preventDefault: () => void; stopPropagation: () => void }) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function useCompactReviewLayout() {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const media = window.matchMedia(REVIEW_COMPACT_MEDIA_QUERY);
+    const sync = () => setCompact(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return compact;
+}
 
 type DesktopReviewLayoutProps = {
   review: CreateReviewResponse;
   onReviewChange: (review: CreateReviewResponse) => void;
   onReset: () => void;
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  fixture: "内置演示",
+  deepseek: "DeepSeek",
+  openai: "OpenAI",
+};
+
+const ACTION_TOAST: Record<FindingAction, string> = {
+  accept: "已接受修改，正文已更新",
+  ignore: "已忽略该问题",
+  verify: "已标记为待核实",
 };
 
 export function DesktopReviewLayout({
@@ -27,10 +66,23 @@ export function DesktopReviewLayout({
   const [actionError, setActionError] = useState<string | null>(null);
   const [readingMode, setReadingMode] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [listRevealNonce, setListRevealNonce] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const compact = useCompactReviewLayout();
+  const sheetContentHidden = compact && !sheetOpen;
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+    const timer = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   function selectFromArticle(findingId: string) {
     setSelectedFindingId(findingId);
     setSheetOpen(true);
+    setListRevealNonce((value) => value + 1);
   }
 
   function selectFromList(findingId: string) {
@@ -73,6 +125,7 @@ export function DesktopReviewLayout({
       if (nextSelected && nextSelected !== selectedFindingId) {
         setFocusNonce((value) => value + 1);
       }
+      setToast(ACTION_TOAST[action]);
     } catch (caught) {
       setActionError(caught instanceof Error ? caught.message : "操作失败");
     } finally {
@@ -80,55 +133,79 @@ export function DesktopReviewLayout({
     }
   }
 
+  const totalCount = review.findings.length;
   const unresolvedCount = unresolvedFindings(review.findings).length;
+  const resolvedCount = review.findings.filter(
+    (finding) => !isUnresolvedStatus(finding.status),
+  ).length;
+  const progressPct =
+    totalCount === 0 ? 100 : Math.round((resolvedCount / totalCount) * 100);
+  const providerLabel =
+    PROVIDER_LABEL[review.pipeline.provider] ?? review.pipeline.provider;
+  const elapsedSeconds = (review.pipeline.elapsed_ms / 1000).toFixed(1);
 
   return (
     <div
       className={`review-shell${readingMode ? " is-reading" : ""}${sheetOpen ? " is-sheet-open" : " is-sheet-collapsed"}`}
       data-testid="desktop-review"
+      data-compact={compact ? "true" : "false"}
     >
       <header className="review-header">
-        <div>
-          <p className="eyebrow">Guangming Review Copilot</p>
-          <h1>光明审校 Copilot</h1>
-        </div>
+        <Masthead />
         <div className="review-header-meta">
-          <span data-testid="finding-count">
-            发现 {review.findings.length} 个问题 · 待处理 {unresolvedCount}
+          <span className="review-stats" data-testid="finding-count">
+            发现 {totalCount} 个问题 · 待处理 {unresolvedCount}
+          </span>
+          <span
+            className="review-progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={totalCount}
+            aria-valuenow={resolvedCount}
+            aria-label="处理进度"
+          >
+            <i style={{ width: `${progressPct}%` }} />
           </span>
           <span className="pipeline-meta">
-            v{review.article.version} · {review.pipeline.provider}
+            v{review.article.version} · {providerLabel}
+            {review.pipeline.model ? ` · ${review.pipeline.model}` : ""} ·{" "}
+            {elapsedSeconds}s
           </span>
           <button
             type="button"
             className="ghost-button"
             data-testid="reading-mode-toggle"
+            aria-pressed={readingMode}
             onClick={() => setReadingMode((value) => !value)}
           >
-            {readingMode ? "显示标注" : "纯阅读"}
+            <IconBook />
+            {readingMode ? "退出阅读" : "纯阅读"}
           </button>
           <button type="button" className="ghost-button" onClick={onReset}>
+            <IconRefresh />
             重新审校
           </button>
         </div>
       </header>
       {review.pipeline.fallback?.used ? (
-        <p className="fallback-banner" data-testid="fallback-banner">
+        <p className="fallback-banner" role="status" data-testid="fallback-banner">
+          <IconAlert />
           审校模型不可用，已降级为规则结果。{review.pipeline.fallback.reason}
         </p>
       ) : null}
       {unresolvedCount === 0 ? (
-        <p className="review-complete" data-testid="review-complete">
-          本轮待处理问题已完成。
+        <p className="review-complete" role="status" data-testid="review-complete">
+          <IconCheck />
+          本轮待处理问题已全部处理完毕。
         </p>
       ) : null}
       {actionError ? (
-        <p className="form-error action-error" data-testid="action-error">
+        <p className="form-error action-error" role="alert" data-testid="action-error">
           {actionError}
         </p>
       ) : null}
       <div className="review-columns">
-        <section className="review-pane review-pane-article">
+        <section className="review-pane review-pane-article" aria-label="稿件正文">
           <ArticleDocument
             article={review.article}
             findings={review.findings}
@@ -141,26 +218,60 @@ export function DesktopReviewLayout({
         <aside
           className="review-pane review-pane-findings"
           data-testid="findings-sheet"
+          aria-label="审校意见"
         >
           <button
             type="button"
             className="sheet-toggle"
             data-testid="findings-sheet-toggle"
+            aria-expanded={compact ? sheetOpen : true}
+            aria-controls="findings-sheet-panel"
             onClick={() => setSheetOpen((value) => !value)}
           >
-            {sheetOpen ? "收起审校结果" : "展开审校结果"}
+            <span className="sheet-handle" aria-hidden="true" />
+            <span className="sheet-summary">
+              <span className="sheet-summary-count">
+                审校意见 · 待处理 {unresolvedCount}
+              </span>
+              <span className="sheet-summary-action">
+                {sheetOpen ? "收起" : "展开"}
+              </span>
+            </span>
           </button>
-          <FindingList
-            findings={review.findings}
-            selectedFindingId={selectedFindingId}
-            pendingActionFindingId={pendingActionFindingId}
-            onSelectFinding={selectFromList}
-            onDecide={(findingId, action) => {
-              void decide(findingId, action);
-            }}
-          />
+          <div
+            id="findings-sheet-panel"
+            className="findings-sheet-body"
+            data-testid="findings-sheet-panel"
+            hidden={sheetContentHidden}
+            inert={sheetContentHidden}
+            onClickCapture={sheetContentHidden ? blockHiddenSheetEvents : undefined}
+            onKeyDownCapture={sheetContentHidden ? blockHiddenSheetEvents : undefined}
+            onPointerDownCapture={sheetContentHidden ? blockHiddenSheetEvents : undefined}
+          >
+            <div className="findings-head">
+              <h2 className="findings-title">审校意见</h2>
+              <span className="findings-count">
+                共 {totalCount} 条 · 待处理 {unresolvedCount}
+              </span>
+            </div>
+            <FindingList
+              findings={review.findings}
+              selectedFindingId={selectedFindingId}
+              pendingActionFindingId={pendingActionFindingId}
+              revealNonce={listRevealNonce}
+              onSelectFinding={selectFromList}
+              onDecide={(findingId, action) => {
+                void decide(findingId, action);
+              }}
+            />
+          </div>
         </aside>
       </div>
+      {toast ? (
+        <p className="action-toast" role="status" data-testid="action-toast">
+          {toast}
+        </p>
+      ) : null}
     </div>
   );
 }
