@@ -459,6 +459,242 @@ button {
   color: var(--gold);
 }
 
+/* ---------- 专项核验（多 Agent 只读解释） ---------- */
+
+.specialist-orchestration-panel {
+  flex: none;
+  max-height: min(48%, 420px);
+  overflow: auto;
+  padding: 12px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-card);
+}
+
+.specialist-orchestration-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.specialist-orchestration-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.specialist-orchestration-status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.specialist-orchestration-status-pill.status-disabled,
+.specialist-orchestration-status-pill.status-not_invoked {
+  color: var(--ink-2);
+  background: rgba(96, 90, 81, 0.12);
+}
+
+.specialist-orchestration-status-pill.status-enabled,
+.specialist-orchestration-status-pill.status-succeeded {
+  color: var(--ok);
+  background: rgba(2, 122, 72, 0.1);
+}
+
+.specialist-orchestration-status-pill.status-failed,
+.specialist-orchestration-status-pill.status-timed_out {
+  color: var(--gold);
+  background: var(--gold-tint);
+}
+
+.specialist-orchestration-summary,
+.specialist-orchestration-meta,
+.specialist-orchestration-empty {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.specialist-orchestration-meta {
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.specialist-orchestration-empty {
+  margin-top: 8px;
+  color: var(--gold);
+}
+
+.specialist-call-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.specialist-call {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-inset);
+}
+
+.specialist-call-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.specialist-call-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.specialist-call-skip,
+.specialist-call-elapsed {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.specialist-call-elapsed {
+  font-variant-numeric: tabular-nums;
+}
+
+.specialist-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.specialist-section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.specialist-fragment + .specialist-fragment,
+.specialist-candidate + .specialist-candidate,
+.specialist-verify + .specialist-verify {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.specialist-quote {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 7px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+  background: var(--accent-tint);
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.specialist-fields {
+  margin: 0;
+}
+
+.specialist-field {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.specialist-field:last-child {
+  margin-bottom: 0;
+}
+
+.specialist-field dt {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.specialist-field dd {
+  margin: 0;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.specialist-candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.specialist-candidate-title {
+  margin: 8px 0;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.specialist-evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.specialist-evidence-heading {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.specialist-verify-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--gold-tint);
+  color: #6e5716;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.specialist-verify-reason svg {
+  flex: none;
+  margin-top: 2px;
+}
+
 /* ---------- 纸面正文 ---------- */
 
 .article-document {
@@ -1349,6 +1585,26 @@ button {
     font-size: 12px;
   }
 
+  .specialist-orchestration-panel {
+    max-height: min(40%, 280px);
+    padding: 10px 16px 12px;
+  }
+
+  .specialist-call-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .specialist-field {
+    grid-template-columns: 4.5em minmax(0, 1fr);
+    font-size: 13px;
+  }
+
+  .specialist-quote,
+  .specialist-verify-reason,
+  .specialist-candidate-title {
+    font-size: 14px;
+  }
+
   .review-shell.is-reading .source-mark {
     background: transparent;
     border-bottom-color: transparent;
@@ -1430,6 +1686,40 @@ button {
 
   .article-body {
     font-size: 16px;
+  }
+
+  .specialist-orchestration-panel {
+    padding: 10px 12px 12px;
+    max-height: min(44%, 320px);
+  }
+
+  .specialist-orchestration-title {
+    font-size: 16px;
+  }
+
+  .specialist-orchestration-summary,
+  .specialist-call-skip,
+  .specialist-call-elapsed {
+    font-size: 13px;
+  }
+
+  .specialist-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+    margin-bottom: 8px;
+  }
+
+  .specialist-field dt {
+    font-size: 12px;
+  }
+
+  .specialist-field dd {
+    font-size: 14px;
+  }
+
+  .specialist-quote,
+  .specialist-verify-reason {
+    font-size: 15px;
   }
 
   .input-main {
