@@ -1,0 +1,521 @@
+{
+  "protocol_id": "agent-orchestration-dev-eval",
+  "protocol_version": "0.3.0",
+  "dataset_version": "0.3.0",
+  "role": "development_only",
+  "split": "dev",
+  "official_holdout": false,
+  "may_claim_official_locked_generalization": false,
+  "provenance": {
+    "authoring": "handwritten_synthetic",
+    "contains_unpublished_real_articles": false,
+    "contains_real_pii": false,
+    "contains_holdout_gold": false,
+    "network_required_to_score": false
+  },
+  "orchestration_budget": {
+    "max_specialists_per_article": 2,
+    "max_parallel_invocations": 2,
+    "max_extra_model_calls_per_article": 2,
+    "max_extra_tokens_per_article": 4000,
+    "specialist_deadline_ms": 2000
+  },
+  "gates": {
+    "dispatch_accuracy": { "operator": "gte", "threshold": 0.85, "hardness": "soft" },
+    "parallel_budget_compliance_rate": { "operator": "eq", "threshold": 1, "hardness": "hard" },
+    "failure_degradation_correctness": { "operator": "eq", "threshold": 1, "hardness": "hard" },
+    "result_traceability_rate": { "operator": "gte", "threshold": 0.9, "hardness": "soft" },
+    "duplicate_suppression_rate": { "operator": "eq", "threshold": 1, "hardness": "hard" },
+    "extra_model_cost_compliance_rate": { "operator": "eq", "threshold": 1, "hardness": "hard" }
+  },
+  "enumerations": {
+    "specialist_ids": ["fact_check", "news_edit"],
+    "review_dimensions": ["entity", "policy", "numeric", "citation"],
+    "execution_statuses": ["not_invoked", "succeeded", "failed", "timed_out"],
+    "trigger_kinds": [
+      "entity",
+      "policy",
+      "numeric",
+      "citation",
+      "wording",
+      "consistency",
+      "basic_text",
+      "none"
+    ],
+    "failure_kinds": ["timeout", "provider_error", "empty_evidence"]
+  },
+  "cases": [
+    {
+      "case_id": "ao-dev-001-fact-entity-dispatch",
+      "article_id": "ao-dev-art-entity-a",
+      "specialist": "fact_check",
+      "trigger_kind": "entity",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯（记者 周启明）青石市教育局局长陈文博昨日在基础教育工作会议上讲话，强调要把课后服务覆盖到全部义务教育学校。",
+      "candidate_span": {
+        "text": "青石市教育局局长陈文博",
+        "span_quote": "青石市教育局局长陈文博"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-gov/leaders/chen-wenbo",
+          "excerpt": "市教育局局长 陈文博",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "公开机构负责人姓名与职务属于 entity 审校维度，应派发 fact_check；夹具可追溯，允许进入候选 Finding。"
+    },
+    {
+      "case_id": "ao-dev-002-fact-entity-skip",
+      "article_id": "ao-dev-art-entity-skip",
+      "specialist": "fact_check",
+      "trigger_kind": "entity",
+      "as_of": "2026-08-18",
+      "article_excerpt": "社区居民笑着说，还得麻烦张叔帮忙把通知贴到楼下。",
+      "candidate_span": {
+        "text": "张叔",
+        "span_quote": "张叔"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 9,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "口头尊称不是可核验公开职务，路由器不应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-003-fact-policy-dispatch",
+      "article_id": "ao-dev-art-policy-a",
+      "specialist": "fact_check",
+      "trigger_kind": "policy",
+      "as_of": "2026-08-18",
+      "article_excerpt": "会议要求认真执行《青石市节约用水管理办法》。该办法自2024年3月1日起施行。",
+      "candidate_span": {
+        "text": "《青石市节约用水管理办法》",
+        "span_quote": "《青石市节约用水管理办法》"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-gazette/2024/water-conservation",
+          "excerpt": "《青石市节约用水管理办法》自2024年3月1日起施行",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "具名管理办法属于 policy 审校维度，应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-004-fact-policy-skip",
+      "article_id": "ao-dev-art-policy-skip",
+      "specialist": "fact_check",
+      "trigger_kind": "policy",
+      "as_of": "2026-08-18",
+      "article_excerpt": "与会代表表示，要完整、准确、全面贯彻新发展理念，推动高质量发展。",
+      "candidate_span": {
+        "text": "推动高质量发展",
+        "span_quote": "推动高质量发展"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 9,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "口号式表述没有具名文件，不应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-005-fact-numeric-dispatch",
+      "article_id": "ao-dev-art-numeric-a",
+      "specialist": "fact_check",
+      "trigger_kind": "numeric",
+      "as_of": "2026-08-18",
+      "article_excerpt": "通报称，青石市2025年粮食总产量128.6万吨；同稿附表写全年粮食总产量121.3万吨。",
+      "candidate_span": {
+        "text": "粮食总产量128.6万吨",
+        "span_quote": "粮食总产量128.6万吨"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://article/internal-table/grain-2025",
+          "excerpt": "附表：全年粮食总产量121.3万吨",
+          "authority_level": "internal"
+        }
+      ],
+      "adjudication_hint": "同一指标文内数字冲突属于 numeric 审校维度，应派发 fact_check，并把计算交给确定性核对。"
+    },
+    {
+      "case_id": "ao-dev-006-fact-numeric-skip",
+      "article_id": "ao-dev-art-numeric-skip",
+      "specialist": "fact_check",
+      "trigger_kind": "numeric",
+      "as_of": "2026-08-18",
+      "article_excerpt": "座谈会持续约两个小时，与会人员随后参观了展示区。",
+      "candidate_span": {
+        "text": "持续约两个小时",
+        "span_quote": "持续约两个小时"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 9,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "现场约数时长不是可计算冲突，不应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-007-fact-citation-dispatch",
+      "article_id": "ao-dev-art-citation-a",
+      "specialist": "fact_check",
+      "trigger_kind": "citation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市统计局新闻发言人沈秋实在发布会上介绍：“上半年全市固定资产投资同比增长6.2%。”",
+      "candidate_span": {
+        "text": "上半年全市固定资产投资同比增长6.2%",
+        "span_quote": "上半年全市固定资产投资同比增长6.2%"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-stats/briefing/2026h1",
+          "excerpt": "新闻发言人沈秋实：上半年全市固定资产投资同比增长6.2%",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "具名发言人加引语属于 citation 审校维度，应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-008-fact-citation-skip",
+      "article_id": "ao-dev-art-citation-skip",
+      "specialist": "fact_check",
+      "trigger_kind": "citation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报评论员认为，把便民市场建到家门口，是城市治理的温度。",
+      "candidate_span": {
+        "text": "本报评论员认为",
+        "span_quote": "本报评论员认为"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 9,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "本报观点不是外部引语核验对象，不应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-009-timeout-fact-check",
+      "article_id": "ao-dev-art-timeout",
+      "specialist": "fact_check",
+      "trigger_kind": "entity",
+      "as_of": "2026-08-18",
+      "article_excerpt": "该项试点由青石市数据管理局会同兰水区政府组织实施。",
+      "candidate_span": {
+        "text": "青石市数据管理局",
+        "span_quote": "青石市数据管理局"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "timed_out",
+      "expected_failure": "timeout",
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-gov/orgs/data-bureau",
+          "excerpt": "青石市数据管理局",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "开发夹具设定 fact_check 超时。正确降级是 timed_out，且不得把结果写入 Finding。"
+    },
+    {
+      "case_id": "ao-dev-010-fail-news-edit",
+      "article_id": "ao-dev-art-fail",
+      "specialist": "news_edit",
+      "trigger_kind": "consistency",
+      "as_of": "2026-08-18",
+      "article_excerpt": "导语写澄江新区夜间施工已经全面停工，正文又写部分工地将继续夜间作业。",
+      "candidate_span": {
+        "text": "部分工地将继续夜间作业",
+        "span_quote": "部分工地将继续夜间作业"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "failed",
+      "expected_failure": "provider_error",
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "导语与正文口径冲突属于 consistency，需要编辑判断如何改写，应派发 news_edit。开发夹具设定 provider 失败。正确降级是 failed，不得伪造 succeeded。"
+    },
+    {
+      "case_id": "ao-dev-011-dup-canonical-fact",
+      "article_id": "ao-dev-art-dup",
+      "specialist": "fact_check",
+      "trigger_kind": "citation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市教育局局长陈文博说：“课后服务要实现全覆盖。” 通稿后段再次写道，陈文博说：“课后服务要实现全覆盖。”",
+      "candidate_span": {
+        "text": "课后服务要实现全覆盖",
+        "span_quote": "课后服务要实现全覆盖"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-edu/speech/after-class-service",
+          "excerpt": "陈文博：课后服务要实现全覆盖",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "同一引语的第一次出现应派发 fact_check 一次。"
+    },
+    {
+      "case_id": "ao-dev-012-dup-repeat-fact",
+      "article_id": "ao-dev-art-dup",
+      "specialist": "fact_check",
+      "trigger_kind": "citation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "青石市教育局局长陈文博说：“课后服务要实现全覆盖。” 通稿后段再次写道，陈文博说：“课后服务要实现全覆盖。”",
+      "candidate_span": {
+        "text": "课后服务要实现全覆盖",
+        "span_quote": "课后服务要实现全覆盖"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 2,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": "ao-dev-011-dup-canonical-fact",
+      "expected_enters_findings": false,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-edu/speech/after-class-service",
+          "excerpt": "陈文博：课后服务要实现全覆盖",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "同一篇文章、同一 fact_check 任务、同一引语不得再包一层模型调用。应抑制为 duplicate。"
+    },
+    {
+      "case_id": "ao-dev-013-budget-fact-entity",
+      "article_id": "ao-dev-art-budget",
+      "specialist": "fact_check",
+      "trigger_kind": "entity",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯青石市卫生健康委主任柳南出席会议。会议传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%，并引述专家说：“接种工作已经覆盖全部适龄人群。”导语写接种工作已经覆盖全部适龄人群，文末又写部分乡镇仍在组织补种。",
+      "candidate_span": {
+        "text": "青石市卫生健康委主任柳南",
+        "span_quote": "青石市卫生健康委主任柳南"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-health/leaders/liu-nan",
+          "excerpt": "主任 柳南",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "同一篇文章有4个应派发任务，每篇最多2个 specialist。本条优先级最高，合规 traces 应派发 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-014-budget-news-edit",
+      "article_id": "ao-dev-art-budget",
+      "specialist": "news_edit",
+      "trigger_kind": "consistency",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯青石市卫生健康委主任柳南出席会议。会议传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%，并引述专家说：“接种工作已经覆盖全部适龄人群。”导语写接种工作已经覆盖全部适龄人群，文末又写部分乡镇仍在组织补种。",
+      "candidate_span": {
+        "text": "部分乡镇仍在组织补种",
+        "span_quote": "部分乡镇仍在组织补种"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 2,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://stylebook/lead-body-consistency",
+          "excerpt": "导语“已经覆盖全部适龄人群”与文末“部分乡镇仍在组织补种”口径冲突，需编辑改写",
+          "authority_level": "internal"
+        }
+      ],
+      "adjudication_hint": "优先级2，预算内应派发 news_edit 处理导语与文末口径冲突，而不是把的/地交给 specialist。"
+    },
+    {
+      "case_id": "ao-dev-015-budget-fact-numeric",
+      "article_id": "ao-dev-art-budget",
+      "specialist": "fact_check",
+      "trigger_kind": "numeric",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯青石市卫生健康委主任柳南出席会议。会议传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%，并引述专家说：“接种工作已经覆盖全部适龄人群。”导语写接种工作已经覆盖全部适龄人群，文末又写部分乡镇仍在组织补种。",
+      "candidate_span": {
+        "text": "全市疫苗接种率达到98.7%",
+        "span_quote": "全市疫苗接种率达到98.7%"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 3,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-health/stats/vaccination",
+          "excerpt": "全市疫苗接种率 96.1%",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "优先级3，超出每篇 2 个 specialist 预算。合规 traces 应跳过；跳过记派发 FN，但并行预算与成本指标仍可合规。"
+    },
+    {
+      "case_id": "ao-dev-016-budget-fact-citation",
+      "article_id": "ao-dev-art-budget",
+      "specialist": "fact_check",
+      "trigger_kind": "citation",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯青石市卫生健康委主任柳南出席会议。会议传达《青石市突发公共卫生事件应急预案（2022年版）》。会上公布全市疫苗接种率达到98.7%，并引述专家说：“接种工作已经覆盖全部适龄人群。”导语写接种工作已经覆盖全部适龄人群，文末又写部分乡镇仍在组织补种。",
+      "candidate_span": {
+        "text": "接种工作已经覆盖全部适龄人群",
+        "span_quote": "接种工作已经覆盖全部适龄人群"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 4,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://qingshi-health/briefing/vaccination-quote",
+          "excerpt": "专家：接种工作已经覆盖全部适龄人群",
+          "authority_level": "official"
+        }
+      ],
+      "adjudication_hint": "优先级最低。合规 traces 在预算用尽后可跳过；跳过记派发 FN，但不得靠超预算把分数做高。"
+    },
+    {
+      "case_id": "ao-dev-017-no-span-skip",
+      "article_id": "ao-dev-art-nospan",
+      "specialist": "fact_check",
+      "trigger_kind": "none",
+      "as_of": "2026-08-18",
+      "article_excerpt": "社区花园在雨后显得格外清爽，居民在树荫下聊天。",
+      "candidate_span": {
+        "text": "社区花园在雨后显得格外清爽",
+        "span_quote": "社区花园在雨后显得格外清爽"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 9,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "无目标 span，不得为了“多 Agent”而空转 fact_check 或 news_edit。"
+    },
+    {
+      "case_id": "ao-dev-018-no-evidence-skip",
+      "article_id": "ao-dev-art-noevidence",
+      "specialist": "fact_check",
+      "trigger_kind": "entity",
+      "as_of": "2026-08-18",
+      "article_excerpt": "据介绍，澄江绿色产业协同中心将为中小企业提供检验检测服务。",
+      "candidate_span": {
+        "text": "澄江绿色产业协同中心",
+        "span_quote": "澄江绿色产业协同中心"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 8,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "没有合适检索证据时不调用 fact_check，不能靠模型编造机构身份。"
+    },
+    {
+      "case_id": "ao-dev-019-news-edit-wording-dispatch",
+      "article_id": "ao-dev-art-news-edit-a",
+      "specialist": "news_edit",
+      "trigger_kind": "wording",
+      "as_of": "2026-08-18",
+      "article_excerpt": "本报讯青石市昨日召开基础教育工作会议强调一定要把课后服务这件事儿给办好。",
+      "candidate_span": {
+        "text": "把课后服务这件事儿给办好",
+        "span_quote": "把课后服务这件事儿给办好"
+      },
+      "should_dispatch": true,
+      "dispatch_priority": 1,
+      "expected_status": "succeeded",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": true,
+      "fixture_evidence": [
+        {
+          "locator": "fixture://stylebook/spoken-to-news",
+          "excerpt": "新闻语体应避免口语“这件事儿给办好”",
+          "authority_level": "internal"
+        }
+      ],
+      "adjudication_hint": "口语化表述属于 wording，应派发 news_edit，而不是再开一个 fact_check。"
+    },
+    {
+      "case_id": "ao-dev-020-basic-text-skip",
+      "article_id": "ao-dev-art-basic-text-skip",
+      "specialist": "news_edit",
+      "trigger_kind": "basic_text",
+      "as_of": "2026-08-18",
+      "article_excerpt": "兰水区便民市场已于上周开门营业，把服务进一步的做好。",
+      "candidate_span": {
+        "text": "进一步的做好",
+        "span_quote": "进一步的做好"
+      },
+      "should_dispatch": false,
+      "dispatch_priority": 9,
+      "expected_status": "not_invoked",
+      "expected_failure": null,
+      "duplicate_of": null,
+      "expected_enters_findings": false,
+      "fixture_evidence": [],
+      "adjudication_hint": "的/地属于确定性规则引擎的 basic_text，不得派发 news_edit，也不得当作 specialist 成功、失败或预算样例。"
+    }
+  ]
+}
