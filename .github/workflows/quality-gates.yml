@@ -1,0 +1,52 @@
+# Offline quality gates. Fail closed on the first failing step.
+# Does not run live model, dev-live, official locked, or holdout commands.
+name: Quality gates
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gates:
+    name: Typecheck, lint, offline tests, production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          # Next.js 16 requires >=20.9.0; @types/node in this repo is 20.x.
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Generate Next.js types
+        run: npm exec -- next typegen ./apps/web
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Offline tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
