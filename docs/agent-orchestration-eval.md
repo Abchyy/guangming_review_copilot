@@ -8,6 +8,7 @@
 
 - 样例与门槛：`packages/benchmark/src/agent-orchestration-eval/dataset.json`
 - 离线 schema / 评分器：`packages/benchmark` 的 `agent-orchestration-eval` 导出
+- development-only 接线：`packages/benchmark` 的 `agent-orchestration-harness` 导出，把公开 `SpecialistOrchestrationRun` 与合成 case 元数据转成可评分 traces
 
 ## 1. 目的与非目的
 
@@ -57,10 +58,11 @@
 为保持与未定实现解耦：
 
 - gold 与 traces 都是 JSON 合同，字段用稳定字符串枚举，不用产品包的 class / interface。
-- specialist 与规划中的运行时一致，只有 `fact_check` 与 `news_edit`。本包不 import `@grc/contracts`，也不把编排接入产品主链路。
+- specialist 与规划中的运行时一致，只有 `fact_check` 与 `news_edit`。评分器不 import `@grc/contracts`，也不把编排接入产品主链路。
 - `entity` / `policy` / `numeric` / `citation` 只作为 `trigger_kind`（审校维度），不能再作为 Specialist。
 - 证据定位符使用 `locator` 字符串。开发夹具使用 `fixture://...`。评分器只检查 locator / excerpt / task id 是否可追溯，不发起 HTTP。
-- traces 由未来实现或人工记录后**注入评分器**。本包不 import、不调用 `packages/review-core`、`packages/providers` 或任何编排 runtime。
+- traces 由实现或人工记录后**注入评分器**。评分器目录不 import `@grc/contracts`、`packages/review-core`、`packages/providers` 或任何编排 runtime。
+- 仓库内的 development-only harness 只读公开 contracts 与合成 fixture，把 `SpecialistOrchestrationRun` 投影为 traces；它不打开产品开关，不读取 holdout。
 - 不得为了迁就本协议去改 `apps/**`、产品 pipeline 或把 `specialists_enabled` 打开。
 
 ## 4. 样例合同
@@ -233,9 +235,14 @@ gold 中 `duplicate_of` 非空的 case 必须同时满足：
 ```bash
 # 校验样例合同、覆盖面和评分器（不联网，不跑 official freeze）
 npx vitest run tests/benchmark/agent-orchestration-eval.test.ts
+
+# 公开 contracts + 合成 fixture 的 development-only 接线（不打开产品运行时）
+npx vitest run tests/benchmark/agent-orchestration-harness.test.ts
 ```
 
-后续若有编排实现，应把 recorded traces 写成与 `agentOrchestrationDevTraceSchema` 兼容的 JSON，再调用 `scoreAgentOrchestrationDevRun(dataset, traces, { result_class: "dev_system_run" })`。在实现落地前，仓库里不存在产品 run 的通过结果。`pipeline.specialists_enabled` 必须保持 `false`。
+把 `SpecialistOrchestrationRun` 与合成 case 元数据转成 traces 时，调用 `runAgentOrchestrationDevHarness` / `scoreAgentOrchestrationDevHarnessTraces`。夹具与 self-check 必须标注 `result_class: "protocol_self_check"`，不得写成 `dev_system_run` 或 official 结论。
+
+`dev_system_run` 只留给非夹具的产品 recorded traces。本仓库的 harness 不产生这类结论。`pipeline.specialists_enabled` 仍由产品运行时开关决定，本协议不得把它打开。
 
 ## 10. 禁止事项
 

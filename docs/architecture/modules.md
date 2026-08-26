@@ -22,7 +22,7 @@ import { createReview } from "@grc/review-core";
 | providers | `packages/providers` | 模型 adapter、prompt、cache、fallback 模式 | `ReviewModel`、`FixtureReviewModel`、`getFallbackMode` | 业务规则、排序、DB 写入 |
 | review-store | `packages/review-store` | Accept/Ignore/Verify 状态机 + SQLite | `ReviewStore`、`canTransition`、`openReviewDatabase` | Next、benchmark |
 | web | `apps/web` | UI、Route Handler 组合 | `/api/reviews` | 质量算法、holdout |
-| benchmark | `packages/benchmark` | 开发评估 | `evaluateReview`、`loadBenchmarkDataset`、web-evidence-eval、agent-orchestration-eval | 污染 prompt/rules/corpus |
+| benchmark | `packages/benchmark` | 开发评估 | `evaluateReview`、`loadBenchmarkDataset`、web-evidence-eval、agent-orchestration-eval、development-only agent-orchestration-harness | 污染 prompt/rules/corpus、把 fixture/self-check 写成 official 或 `dev_system_run` |
 | holdout-protocol | `packages/holdout-protocol` | official freeze / fail-closed | freeze/inference/evaluation | 被产品运行时导入 |
 | test-kit | `packages/test-kit` | 离线测试辅助 | 仅测试 | 产品依赖 |
 
