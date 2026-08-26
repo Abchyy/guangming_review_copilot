@@ -4,7 +4,11 @@ import type { CreateReviewResponse, ReviewCandidate, WebEvidenceCollector } from
 import { WEB_EVIDENCE_UNVERIFIED_MESSAGE } from "@grc/contracts";
 import { FixtureReviewModel } from "@grc/providers";
 import { createReview } from "@grc/review-core";
-import { FakeSearchProvider, createWebEvidenceCollector } from "@grc/web-evidence";
+import {
+  FakeSearchProvider,
+  createWebEvidenceCollector,
+  createWebEvidenceCollectorFromEnv,
+} from "@grc/web-evidence";
 
 const article = {
   title: "我市召开基础教育高质量发展座谈会",
@@ -50,10 +54,17 @@ describe("review-core web evidence integration", () => {
     const explicitOff = await createReview(article, model, {
       webEvidenceCollector: null,
     });
+    const envOff = await createReview(article, model, {
+      webEvidenceCollector: createWebEvidenceCollectorFromEnv({
+        env: { TAVILY_API_KEY: "tvly-dev-test" },
+      }),
+    });
 
     expect(implicit.pipeline.web_evidence).toBeUndefined();
     expect(explicitOff.pipeline.web_evidence).toBeUndefined();
+    expect(envOff.pipeline.web_evidence).toBeUndefined();
     expect(pipelineCore(implicit)).toEqual(pipelineCore(explicitOff));
+    expect(pipelineCore(implicit)).toEqual(pipelineCore(envOff));
     expect(implicit.pipeline.specialists_enabled).toBe(false);
   });
 

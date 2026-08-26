@@ -73,6 +73,19 @@ describe("module boundaries", () => {
     expect(offenders).toEqual([]);
   });
 
+  test("client UI does not import the web-evidence package", () => {
+    const dir = join(root, "apps/web/src/components");
+    const offenders: string[] = [];
+    for (const file of walk(dir)) {
+      for (const spec of importsOf(file)) {
+        if (spec === "@grc/web-evidence" || spec.startsWith("@grc/web-evidence/")) {
+          offenders.push(`${relative(root, file)} -> ${spec}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test("tests consume shared helpers through the test-kit package", () => {
     const offenders = walk(join(root, "tests")).filter((file) =>
       importsOf(file).some((spec) => spec.includes("helpers/")),

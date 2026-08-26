@@ -52,6 +52,7 @@ describe("POST /api/reviews", () => {
     expect(response.status).toBe(200);
     const payload = createReviewResponseSchema.parse(await response.json());
     expect(payload.findings.length).toBeGreaterThan(0);
+    expect(payload.pipeline.web_evidence).toBeUndefined();
     expect(payload.findings.every((finding) => finding.status === "pending")).toBe(true);
     expect(store.getReview(payload.review_id).review_id).toBe(payload.review_id);
     for (const finding of payload.findings) {

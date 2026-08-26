@@ -15,6 +15,7 @@
     "@grc/providers": "*",
     "@grc/review-core": "*",
     "@grc/review-store": "*",
+    "@grc/web-evidence": "*",
     "better-sqlite3": "13.0.3",
     "next": "16.3.1",
     "react": "19.2.8",

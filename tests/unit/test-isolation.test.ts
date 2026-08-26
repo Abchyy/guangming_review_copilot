@@ -41,6 +41,8 @@ function productionLikeModelEnv(): Record<string, string> {
     DEEPSEEK_BASE_URL: "https://llm-proxy.example.com/v1",
     OPENAI_API_KEY: "sk-openai-prod-like-must-not-be-used",
     OPENAI_BASE_URL: "https://openai-proxy.example.com/v1",
+    TAVILY_API_KEY: "tvly-prod-like-must-not-be-used",
+    WEB_EVIDENCE_ENABLED: "true",
     [DEV_LIVE_INTENT]: "1",
     [LOCKED_INTENT]: "1",
     [LIVE_SMOKE_INTENT]: "1",
@@ -56,6 +58,8 @@ function isolationEnv(overrides: Record<string, string | undefined> = {}): NodeJ
     [isolationChildFlag]: "1",
     DEEPSEEK_API_KEY: "sk-fake-must-not-start-live-tests",
     OPENAI_API_KEY: "sk-fake-must-not-start-live-tests",
+    TAVILY_API_KEY: "tvly-fake-must-not-start-live-tests",
+    WEB_EVIDENCE_ENABLED: "true",
     DEEPSEEK_BASE_URL: "http://127.0.0.1:9",
     ...overrides,
   });
