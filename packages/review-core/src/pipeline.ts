@@ -252,8 +252,9 @@ async function createReviewWithSignal(
           excerpt: item.excerpt,
         })),
         ...(options.deadlineMs != null || options.signal
-          ? { signal, timeoutMs: modelTimeoutMs, maxTokens: PRODUCT_REVIEW_MAX_TOKENS }
+          ? { signal, timeoutMs: modelTimeoutMs }
           : {}),
+        ...(options.deadlineMs != null ? { maxTokens: PRODUCT_REVIEW_MAX_TOKENS } : {}),
       });
       rawCandidates = await raceAbort(reviewWork, options.deadlineMs != null || options.signal ? signal : undefined, () => {
         throw new ReviewProviderError("Review deadline exceeded");

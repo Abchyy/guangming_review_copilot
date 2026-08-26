@@ -106,6 +106,25 @@ describe("product review deadline", () => {
     expect(seen[0]?.maxTokens).toBeUndefined();
   });
 
+  test("signal-only still forwards signal and timeout without a token cap", async () => {
+    const seen: ReviewPromptContext[] = [];
+    const model: ReviewModel = {
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      review(_article, context = {}) {
+        seen.push(context);
+        return Promise.resolve([]);
+      },
+    };
+    const controller = new AbortController();
+    await createReview(article, model, { signal: controller.signal });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.signal).toBeInstanceOf(AbortSignal);
+    expect("timeoutMs" in (seen[0] ?? {})).toBe(true);
+    expect(seen[0]?.timeoutMs).toBeUndefined();
+    expect(seen[0]?.maxTokens).toBeUndefined();
+  });
+
   test("a hanging provider is aborted and degrades to rules_only under 60s", async () => {
     const model = new HangingReviewModel();
     const started = Date.now();
