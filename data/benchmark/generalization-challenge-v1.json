@@ -1,0 +1,641 @@
+{
+  "dataset_version": "generalization-challenge-v1.0.0",
+  "role": "adversarial_dev",
+  "official": false,
+  "may_claim_fresh_locked_generalization": false,
+  "construction": {
+    "method": "synthetic_articles_from_public_authoritative_facts_and_internal_consistency_templates",
+    "source_text_copied": false,
+    "intended_use": "development diagnosis and robustness regression",
+    "forbidden_claim": "official_locked_generalization"
+  },
+  "articles": [
+    {
+      "article_id": "gc-01-degree-law-version",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["policy_version", "close_dates", "headline_body_duplication"],
+      "title": "学位法将于2024年元旦起施行",
+      "body": "教育部门近日介绍，《中华人民共和国学位法》于2024年4月26日由十四届全国人大常委会第八次会议表决通过，共7章45条。该法从2024年1月1日起施行，同时废止《中华人民共和国学位条例》。有关高校正在据此修订学位授予细则。",
+      "source_references": [
+        {
+          "authority": "中华人民共和国教育部",
+          "url": "https://www.moe.gov.cn/jyb_xwfb/s6052/moe_838/202404/t20240426_1127760.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "2024年4月26日十四届全国人大常委会第九次会议通过，2025年1月1日起施行"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-01-i1",
+          "type": "datetime",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "2024年元旦",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "2025年元旦",
+          "rationale": "学位法自2025年1月1日起施行。",
+          "evidence_url": "https://www.moe.gov.cn/jyb_xwfb/s6052/moe_838/202404/t20240426_1127760.html"
+        },
+        {
+          "issue_id": "gc-01-i2",
+          "type": "policy",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "第八次会议",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "第九次会议",
+          "rationale": "学位法由十四届全国人大常委会第九次会议表决通过。",
+          "evidence_url": "https://www.moe.gov.cn/jyb_xwfb/s6052/moe_838/202404/t20240426_1127760.html"
+        },
+        {
+          "issue_id": "gc-01-i3",
+          "type": "datetime",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "2024年1月1日",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "2025年1月1日",
+          "rationale": "正文再次写错施行日期。",
+          "evidence_url": "https://www.moe.gov.cn/jyb_xwfb/s6052/moe_838/202404/t20240426_1127760.html"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-02-retirement-transition",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["gradual_policy", "conditional_number", "headline_body_reasoning"],
+      "title": "弹性退休允许职工最多提前五年",
+      "body": "渐进式延迟法定退休年龄政策自2025年1月1日起实施。按照新办法，男职工法定退休年龄从政策实施当日起立即统一调整为63周岁。达到最低缴费年限的职工可自愿弹性提前退休，最长可提前5年，并应至少提前1个月以书面形式告知所在单位。",
+      "source_references": [
+        {
+          "authority": "中华人民共和国人力资源和社会保障部",
+          "url": "https://www.mohrss.gov.cn/wap/xw/rsxw/202501/t20250101_533705.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "2025年起渐进调整；弹性提前最长3年；至少提前3个月书面告知"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-02-i1",
+          "type": "number",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "最多提前五年",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "最多提前三年",
+          "rationale": "弹性提前时间距法定退休年龄最长不超过3年。",
+          "evidence_url": "https://www.mohrss.gov.cn/wap/xw/rsxw/202501/t20250101_533705.html"
+        },
+        {
+          "issue_id": "gc-02-i2",
+          "type": "policy",
+          "severity": "critical",
+          "field": "body",
+          "quoted_text": "从政策实施当日起立即统一调整为63周岁",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "用15年时间从60周岁逐步延迟至63周岁",
+          "rationale": "政策是渐进式调整，不是实施当日一次性统一调整。",
+          "evidence_url": "https://www.mohrss.gov.cn/wap/xw/rsxw/202501/t20250101_533705.html"
+        },
+        {
+          "issue_id": "gc-02-i3",
+          "type": "number",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "提前1个月",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "提前3个月",
+          "rationale": "选择弹性提前退休，应至少提前3个月书面告知单位。",
+          "evidence_url": "https://www.mohrss.gov.cn/wap/xw/rsxw/202501/t20250101_533705.html"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-03-change6-return",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["entity_location", "date_weekday", "unit_magnitude", "world_first"],
+      "title": "嫦娥六号在酒泉完成月背样品返回",
+      "body": "2024年6月26日（星期三）14时07分，嫦娥六号返回器准确着陆。任务随后完成开舱和样品交接，经测量共采集月球样品1935.3千克。这是人类第二次从月球背面采样并返回地球，为研究月球早期演化提供了新材料。",
+      "source_references": [
+        {
+          "authority": "国家航天局",
+          "url": "https://www.cnsa.gov.cn/n6758823/n6758844/n10518102/n10518147/c10565180/content.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "2024年6月25日14时07分着陆内蒙古四子王旗，世界首次月球背面采样返回"
+        },
+        {
+          "authority": "国家航天局",
+          "url": "https://www.cnsa.gov.cn/n6758823/n6758844/n10518102/n10518157/c10570691/content.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "嫦娥六号共采集月球样品1935.3克"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-03-i1",
+          "type": "external_fact",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "在酒泉",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "在内蒙古四子王旗",
+          "rationale": "返回器着陆于内蒙古四子王旗预定区域。",
+          "evidence_url": "https://www.cnsa.gov.cn/n6758823/n6758844/n10518102/n10518147/c10565180/content.html"
+        },
+        {
+          "issue_id": "gc-03-i2",
+          "type": "datetime",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "2024年6月26日（星期三）",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "2024年6月25日（星期二）",
+          "rationale": "着陆发生于2024年6月25日，该日为星期二。",
+          "evidence_url": "https://www.cnsa.gov.cn/n6758823/n6758844/n10518102/n10518147/c10565180/content.html"
+        },
+        {
+          "issue_id": "gc-03-i3",
+          "type": "number",
+          "severity": "critical",
+          "field": "body",
+          "quoted_text": "1935.3千克",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "1935.3克",
+          "rationale": "样品质量单位被放大1000倍。",
+          "evidence_url": "https://www.cnsa.gov.cn/n6758823/n6758844/n10518102/n10518157/c10570691/content.html"
+        },
+        {
+          "issue_id": "gc-03-i4",
+          "type": "external_fact",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "人类第二次",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "人类首次",
+          "rationale": "嫦娥六号实现世界首次月球背面采样返回。",
+          "evidence_url": "https://www.cnsa.gov.cn/n6758823/n6758844/n10518102/n10518147/c10565180/content.html"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-04-census-linked-numbers",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["linked_statistics", "scope_definition", "percentage_consistency"],
+      "title": "七人普显示全国人口十年增加8206万人",
+      "body": "第七次全国人口普查以2020年11月1日零时为标准时点。普查登记的大陆31个省、自治区、直辖市和现役军人人口为1412778724人。与2010年的133972万人相比，十年增加8206万人，增长6.38%，年平均增长率为0.63%。",
+      "source_references": [
+        {
+          "authority": "国家统计局",
+          "url": "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202105/t20210511_1817197.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "大陆31个省区市和现役军人共1411778724人"
+        },
+        {
+          "authority": "国家统计局",
+          "url": "https://www.stats.gov.cn/sj/zxfb/202302/t20230203_1901080.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "较2010年增加7206万人，增长5.38%，年均增长0.53%"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-04-i1",
+          "type": "number",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "增加8206万人",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "增加7206万人",
+          "rationale": "七人普公布的十年增量为7206万人。",
+          "evidence_url": "https://www.stats.gov.cn/sj/zxfb/202302/t20230203_1901080.html"
+        },
+        {
+          "issue_id": "gc-04-i2",
+          "type": "number",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "1412778724人",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "1411778724人",
+          "rationale": "大陆31个省区市和现役军人的精确人口数多写了100万人。",
+          "evidence_url": "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202105/t20210511_1817197.html"
+        },
+        {
+          "issue_id": "gc-04-i3",
+          "type": "number",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "增长6.38%",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "增长5.38%",
+          "rationale": "十年人口增长率为5.38%。",
+          "evidence_url": "https://www.stats.gov.cn/sj/zxfb/202302/t20230203_1901080.html"
+        },
+        {
+          "issue_id": "gc-04-i4",
+          "type": "number",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "年平均增长率为0.63%",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "年平均增长率为0.53%",
+          "rationale": "官方公布的年平均增长率为0.53%。",
+          "evidence_url": "https://www.stats.gov.cn/sj/zxfb/202302/t20230203_1901080.html"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-05-personal-information-law",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["legal_threshold", "meeting_number", "effective_date"],
+      "title": "个人信息保护法将16岁以下信息列为敏感个人信息",
+      "body": "《中华人民共和国个人信息保护法》于2021年8月20日经十三届全国人大常委会第二十九次会议表决通过，自2021年10月1日起施行。法律将不满16周岁未成年人的个人信息明确列入敏感个人信息范围。",
+      "source_references": [
+        {
+          "authority": "中央网络安全和信息化委员会办公室",
+          "url": "https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm",
+          "accessed_at": "2026-08-27",
+          "facts_used": "十三届全国人大常委会第三十次会议通过，2021年11月1日起施行，不满14周岁未成年人信息属于敏感个人信息"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-05-i1",
+          "type": "policy",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "16岁以下",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "不满14周岁",
+          "rationale": "法律规定的是不满14周岁未成年人的个人信息。",
+          "evidence_url": "https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm"
+        },
+        {
+          "issue_id": "gc-05-i2",
+          "type": "policy",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "第二十九次会议",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "第三十次会议",
+          "rationale": "该法由十三届全国人大常委会第三十次会议通过。",
+          "evidence_url": "https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm"
+        },
+        {
+          "issue_id": "gc-05-i3",
+          "type": "datetime",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "2021年10月1日",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "2021年11月1日",
+          "rationale": "个人信息保护法自2021年11月1日起施行。",
+          "evidence_url": "https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-06-accessibility-law-scope",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["scope_overstatement", "law_structure", "effective_date"],
+      "title": "无障碍环境建设法自2023年10月1日起施行",
+      "body": "《中华人民共和国无障碍环境建设法》于2023年6月28日通过，共7章72条。该法规定，无障碍环境便利只面向残疾人提供，老年人及其他有无障碍需求的人员不属于适用对象。",
+      "source_references": [
+        {
+          "authority": "中华人民共和国工业和信息化部",
+          "url": "https://www.miit.gov.cn/jgsj/xgj/scgl/art/2023/art_3f68ef945d7d4f2f9a2b27b7689b6d4d.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "无障碍环境建设法自2023年9月1日起施行"
+        },
+        {
+          "authority": "全国人大相关公开法律文本",
+          "url": "https://policy.mofcom.gov.cn/claw/clawContent.shtml?id=97038",
+          "accessed_at": "2026-08-27",
+          "facts_used": "法律共8章72条，保障残疾人、老年人，其他有无障碍需求者也可享受便利"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-06-i1",
+          "type": "datetime",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "2023年10月1日",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "2023年9月1日",
+          "rationale": "无障碍环境建设法自2023年9月1日起施行。",
+          "evidence_url": "https://www.miit.gov.cn/jgsj/xgj/scgl/art/2023/art_3f68ef945d7d4f2f9a2b27b7689b6d4d.html"
+        },
+        {
+          "issue_id": "gc-06-i2",
+          "type": "number",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "共7章72条",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "共8章72条",
+          "rationale": "法律结构为8章72条。",
+          "evidence_url": "https://policy.mofcom.gov.cn/claw/clawContent.shtml?id=97038"
+        },
+        {
+          "issue_id": "gc-06-i3",
+          "type": "policy",
+          "severity": "critical",
+          "field": "body",
+          "quoted_text": "只面向残疾人提供",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "面向残疾人、老年人及其他有无障碍需求的人员提供",
+          "rationale": "正文错误缩小了法律保障对象范围。",
+          "evidence_url": "https://policy.mofcom.gov.cn/claw/clawContent.shtml?id=97038"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-07-two-regulations-clean",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["clean_control", "similar_effective_dates", "different_legal_forms"],
+      "title": "爱国主义教育法和未成年人网络保护条例同日施行",
+      "body": "《中华人民共和国爱国主义教育法》于2023年10月24日经十四届全国人大常委会第六次会议通过，共5章40条。《未成年人网络保护条例》于2023年9月20日经国务院第15次常务会议通过，以国务院令第766号公布。两者均自2024年1月1日起施行。",
+      "source_references": [
+        {
+          "authority": "中华人民共和国教育部",
+          "url": "https://www.moe.gov.cn/jyb_xwfb/s5147/202401/t20240102_1097378.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "爱国主义教育法通过时间、会议届次、5章40条及施行日期"
+        },
+        {
+          "authority": "中国政府网",
+          "url": "https://app.www.gov.cn/govdata/gov/202310/24/508651/article.html",
+          "accessed_at": "2026-08-27",
+          "facts_used": "未成年人网络保护条例通过时间、国务院令第766号及施行日期"
+        }
+      ],
+      "issues": []
+    },
+    {
+      "article_id": "gc-08-private-economy-law",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["law_vs_regulation", "issuing_body", "close_dates"],
+      "title": "民营经济促进条例4月30日正式施行",
+      "body": "国务院常务会议于2025年4月30日审议通过《中华人民共和国民营经济促进法》。作为我国首部专门促进民营经济发展的行政法规，该文件自2025年5月30日起施行。有关部门将围绕公平竞争、投资融资和权益保护完善配套措施。",
+      "source_references": [
+        {
+          "authority": "中国政府网",
+          "url": "https://www.gov.cn/zhengce/202505/content_7023033.htm",
+          "accessed_at": "2026-08-27",
+          "facts_used": "十四届全国人大常委会第十五次会议于4月30日表决通过民营经济促进法，自2025年5月20日施行"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-08-i1",
+          "type": "policy",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "民营经济促进条例",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "民营经济促进法",
+          "rationale": "正式名称为《中华人民共和国民营经济促进法》，不是条例。",
+          "evidence_url": "https://www.gov.cn/zhengce/202505/content_7023033.htm"
+        },
+        {
+          "issue_id": "gc-08-i2",
+          "type": "organization",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "国务院常务会议",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "十四届全国人大常委会第十五次会议",
+          "rationale": "该法由全国人大常委会会议表决通过。",
+          "evidence_url": "https://www.gov.cn/zhengce/202505/content_7023033.htm"
+        },
+        {
+          "issue_id": "gc-08-i3",
+          "type": "datetime",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "2025年5月30日",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "2025年5月20日",
+          "rationale": "民营经济促进法自2025年5月20日起施行。",
+          "evidence_url": "https://www.gov.cn/zhengce/202505/content_7023033.htm"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-09-gdp-final-revision",
+      "origin": "synthetic_from_public_facts",
+      "difficulty_tags": ["statistical_revision", "preliminary_vs_final", "direction_of_change"],
+      "title": "最终核实：2024年GDP为1349084亿元",
+      "body": "国家统计局完成2024年国内生产总值最终核实。经最终核实，GDP现价总量继续保持初步核算的1349084亿元，较初步核算数增加1018亿元；按不变价格计算，比上年增长5.1%。",
+      "source_references": [
+        {
+          "authority": "国家统计局",
+          "url": "https://www.stats.gov.cn/zs/tjwh/tjkw/tjqk/zgxxb/202512/P020251229312425103483.pdf",
+          "accessed_at": "2026-08-27",
+          "facts_used": "2024年GDP最终核实为1348066亿元，比初步核算减少1018亿元，增长5.0%"
+        }
+      ],
+      "issues": [
+        {
+          "issue_id": "gc-09-i1",
+          "type": "number",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "1349084亿元",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "1348066亿元",
+          "rationale": "标题误把初步核算数写成最终核实数。",
+          "evidence_url": "https://www.stats.gov.cn/zs/tjwh/tjkw/tjqk/zgxxb/202512/P020251229312425103483.pdf"
+        },
+        {
+          "issue_id": "gc-09-i2",
+          "type": "number",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "较初步核算数增加1018亿元",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "较初步核算数减少1018亿元",
+          "rationale": "最终核实数较初步核算数下调，而非增加。",
+          "evidence_url": "https://www.stats.gov.cn/zs/tjwh/tjkw/tjqk/zgxxb/202512/P020251229312425103483.pdf"
+        },
+        {
+          "issue_id": "gc-09-i3",
+          "type": "number",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "增长5.1%",
+          "occurrence": 0,
+          "requires_evidence": true,
+          "expected_correction": "增长5.0%",
+          "rationale": "最终核实的不变价增速为5.0%。",
+          "evidence_url": "https://www.stats.gov.cn/zs/tjwh/tjkw/tjqk/zgxxb/202512/P020251229312425103483.pdf"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-10-municipal-briefing",
+      "origin": "fully_synthetic",
+      "difficulty_tags": ["weekday", "cross_paragraph_sum", "entity_alias", "quote_attribution"],
+      "title": "李明：海州市校舍改造已覆盖192所学校",
+      "body": "2026年8月25日（星期一），海州市教育局召开校舍改造工作通报会。会议介绍，目前已完成128所中小学和54所幼儿园的改造，共计192所。市教育委员会主任李明表示，下一阶段将重点检查消防和无障碍设施。会议结束时，王海总结说：“所有项目必须在开学前完成复核。”",
+      "source_references": [],
+      "issues": [
+        {
+          "issue_id": "gc-10-i1",
+          "type": "datetime",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "2026年8月25日（星期一）",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "2026年8月25日（星期二）",
+          "rationale": "公历日期与星期不一致。"
+        },
+        {
+          "issue_id": "gc-10-i2",
+          "type": "number",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "共计192所",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "共计182所",
+          "rationale": "128所加54所应为182所。"
+        },
+        {
+          "issue_id": "gc-10-i3",
+          "type": "organization",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "市教育委员会",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "市教育局",
+          "rationale": "同一稿件中机构名称前后不一致。"
+        },
+        {
+          "issue_id": "gc-10-i4",
+          "type": "citation",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "王海总结说",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "核实总结发言人是否为李明",
+          "rationale": "标题和前文均以李明为主要发言人，结尾突然改为王海，存在引语归属风险。"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-11-project-progress",
+      "origin": "fully_synthetic",
+      "difficulty_tags": ["headline_body_conflict", "percentage_math", "unit_magnitude", "editorial_typo", "person_name_drift"],
+      "title": "120个项目全部完工，惠及3.2万名学生",
+      "body": "海州市暑期校园改造共安排120个项目项，截至8月下旬已有45个完工，项目完成率为42.5%。市教育局局长陈涛在现场介绍，已完工项目覆盖3200名学生。陈波表示，专项预算为4800万元，目前已支付3.6亿元，剩余项目将在秋季学期开学后继续施工。",
+      "source_references": [],
+      "issues": [
+        {
+          "issue_id": "gc-11-i1",
+          "type": "consistency",
+          "severity": "high",
+          "field": "title",
+          "quoted_text": "全部完工",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "已有45个完工",
+          "rationale": "标题称全部完工，正文称仅45个完工。"
+        },
+        {
+          "issue_id": "gc-11-i2",
+          "type": "basic_text",
+          "severity": "low",
+          "field": "body",
+          "quoted_text": "项目项",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "项目",
+          "rationale": "重复字。"
+        },
+        {
+          "issue_id": "gc-11-i3",
+          "type": "number",
+          "severity": "medium",
+          "field": "body",
+          "quoted_text": "完成率为42.5%",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "完成率为37.5%",
+          "rationale": "45除以120等于37.5%。"
+        },
+        {
+          "issue_id": "gc-11-i4",
+          "type": "number",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "覆盖3200名学生",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "核实应为3200名还是3.2万名学生",
+          "rationale": "正文3200人与标题3.2万人相差10倍。"
+        },
+        {
+          "issue_id": "gc-11-i5",
+          "type": "number",
+          "severity": "critical",
+          "field": "body",
+          "quoted_text": "已支付3.6亿元",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "核实支付金额及单位",
+          "rationale": "已支付金额显著超过4800万元专项预算，疑似单位或数字错误。"
+        },
+        {
+          "issue_id": "gc-11-i6",
+          "type": "person",
+          "severity": "high",
+          "field": "body",
+          "quoted_text": "陈波表示",
+          "occurrence": 0,
+          "requires_evidence": false,
+          "expected_correction": "核实发言人是否为陈涛",
+          "rationale": "同一段先写陈涛介绍，随后无说明改为陈波，存在人名漂移。"
+        }
+      ]
+    },
+    {
+      "article_id": "gc-12-training-clean",
+      "origin": "fully_synthetic",
+      "difficulty_tags": ["clean_control", "multi_step_arithmetic", "unusual_but_consistent"],
+      "title": "三阶段培训覆盖182人，预算执行率75%",
+      "body": "海州市融媒体中心于2026年8月17日至21日完成三阶段业务培训。采编、视频和数据三个班次分别有68人、57人和57人结业，共覆盖182人。项目预算120万元，已支付90万元，预算执行率为75%。各班次名单去重后与结业总人数一致。",
+      "source_references": [],
+      "issues": []
+    }
+  ]
+}
