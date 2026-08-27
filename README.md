@@ -16,7 +16,9 @@ npm install
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。页面预填 Demo 稿件，点击「开始审校」，然后 Accept / Ignore / Verify。
+打开 [http://localhost:3000](http://localhost:3000)。首次进入启动配置页，可填写 DeepSeek 与 Tavily API Key。密钥只保存在服务端进程内存中的会话里，不写磁盘、不进入日志、不返回前端；重启进程后失效。未填写 DeepSeek Key 时使用离线审校；未填写 Tavily Key 时关闭网页核验。填写后对应功能默认开启。本地开发仍可使用 `.env.local`。
+
+进入审校台后页面预填 Demo 稿件，点击「开始审校」，然后 Accept / Ignore / Verify。
 
 默认 `REVIEW_PROVIDER=fixture`。SQLite 默认写到 `.data/guangming-review.db`，该目录已 gitignore。
 

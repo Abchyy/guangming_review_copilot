@@ -1438,6 +1438,60 @@ button {
   color: var(--paper-card);
 }
 
+.runtime-capabilities {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-capabilities li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-inset);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.runtime-capabilities li.is-on {
+  color: var(--ok);
+  border-color: rgba(2, 122, 72, 0.28);
+}
+
+.runtime-capabilities li.is-off {
+  color: var(--gold);
+}
+
+.runtime-capabilities li span {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.field-secret input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-inset);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.field-secret input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .button-spinner {
   width: 13px;
   height: 13px;
@@ -1729,6 +1783,10 @@ button {
   .input-form {
     padding: 24px 20px 24px;
     gap: 18px;
+  }
+
+  .runtime-capabilities {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .form-footer {

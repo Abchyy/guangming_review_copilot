@@ -7,8 +7,15 @@ import type { CreateReviewResponse } from "@grc/contracts";
 import { createReviewResponseSchema } from "@grc/contracts";
 import { DesktopReviewLayout } from "@/components/review/DesktopReviewLayout";
 import { Masthead } from "@/components/review/Masthead";
+import type { RuntimeConfigStatus } from "@/lib/runtime-config";
 
-export function ReviewApp() {
+export function ReviewApp({
+  runtimeStatus,
+  onConfigureRuntime,
+}: {
+  runtimeStatus?: RuntimeConfigStatus | null;
+  onConfigureRuntime?: () => void;
+} = {}) {
   const [title, setTitle] = useState(demoArticle.title);
   const [body, setBody] = useState(demoArticle.body);
   const [review, setReview] = useState<CreateReviewResponse | null>(null);
@@ -57,6 +64,25 @@ export function ReviewApp() {
     <div className="input-shell" data-testid="article-input">
       <header className="review-header">
         <Masthead />
+        {onConfigureRuntime ? (
+          <div className="review-header-meta">
+            {runtimeStatus ? (
+              <p className="pipeline-meta" data-testid="runtime-capability-summary">
+                真实审校{runtimeStatus.capabilities.real_review ? "已启用" : "未启用"}
+                {" · "}
+                网页核验{runtimeStatus.capabilities.web_evidence ? "已启用" : "未启用"}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="ghost-button"
+              data-testid="open-runtime-setup"
+              onClick={onConfigureRuntime}
+            >
+              运行配置
+            </button>
+          </div>
+        ) : null}
       </header>
       <main className="input-main">
         <form

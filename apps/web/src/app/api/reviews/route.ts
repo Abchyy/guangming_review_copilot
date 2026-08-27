@@ -6,22 +6,17 @@ import {
   type SpecialistRuntime,
   type WebEvidenceCollector,
 } from "@grc/contracts";
-import {
-  createSpecialistRuntimeFromEnv,
-  SPECIALIST_REQUEST_TIMEOUT_MS,
-  SPECIALIST_TARGET_MODEL,
-} from "@grc/agent-orchestration";
-import {
-  createReviewModelFromEnv,
-  DeepSeekReviewModel,
-  getDeepSeekApiKey,
-  LlmCandidateCache,
-} from "@grc/providers";
+import { LlmCandidateCache } from "@grc/providers";
 import type { ReviewModel } from "@grc/providers";
 import { PRODUCT_REVIEW_DEADLINE_MS, createReview } from "@grc/review-core";
 import { ReviewStore, getReviewDatabase } from "@grc/review-store";
-import { createWebEvidenceCollectorFromEnv } from "@grc/web-evidence";
+import {
+  createProductSpecialistRuntime,
+  getProductRuntime,
+} from "@/lib/server/product-runtime";
 import { getReviewStore } from "@/lib/server/store-singleton";
+
+export { createProductSpecialistRuntime };
 
 export const maxDuration = 60;
 
@@ -45,21 +40,6 @@ export type ReviewPostHandlerOptions = {
   webEvidenceCollector?: WebEvidenceCollector | null;
   specialistRuntime?: SpecialistRuntime | null;
 };
-
-export function createProductSpecialistRuntime(): SpecialistRuntime | null {
-  const apiKey = getDeepSeekApiKey();
-  if (!apiKey) {
-    return null;
-  }
-  return createSpecialistRuntimeFromEnv(process.env, {
-    clientFactory: () =>
-      new DeepSeekReviewModel({
-        apiKey,
-        model: SPECIALIST_TARGET_MODEL,
-        timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
-      }),
-  });
-}
 
 export function createReviewPostHandler(
   model: ReviewModel,
@@ -109,8 +89,9 @@ export function createReviewPostHandler(
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return createReviewPostHandler(createReviewModelFromEnv(), getReviewStore(), {
-    webEvidenceCollector: createWebEvidenceCollectorFromEnv(),
-    specialistRuntime: createProductSpecialistRuntime(),
+  const runtime = getProductRuntime(request);
+  return createReviewPostHandler(runtime.model, getReviewStore(), {
+    webEvidenceCollector: runtime.webEvidenceCollector,
+    specialistRuntime: runtime.specialistRuntime,
   })(request);
 }

@@ -1,5 +1,5 @@
-import { ReviewApp } from "@/components/review/ReviewApp";
+import { CopilotApp } from "@/components/review/CopilotApp";
 
 export default function Home() {
-  return <ReviewApp />;
+  return <CopilotApp />;
 }
