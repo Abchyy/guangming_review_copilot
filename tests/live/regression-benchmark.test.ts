@@ -17,6 +17,7 @@ import {
   OFFICIAL_BENCHMARK_MODEL,
   DeepSeekReviewModel,
   assertObservedModelMatchesExpected,
+  type SpecialistJsonCompletion,
 } from "@grc/providers";
 import {
   PRODUCT_REVIEW_DEADLINE_MS,
@@ -30,6 +31,12 @@ import {
 
 function reportPath(): string {
   return join(process.cwd(), ".data", "m3-regression-benchmark-last-run.json");
+}
+
+class SingleAttemptDeepSeekReviewModel extends DeepSeekReviewModel {
+  override completeJson(input: SpecialistJsonCompletion) {
+    return super.completeJson({ ...input, maxAttempts: 1 });
+  }
 }
 
 describe("M3 contaminated regression benchmark (diagnostic, never official locked)", () => {
@@ -58,7 +65,7 @@ describe("M3 contaminated regression benchmark (diagnostic, never official locke
     for (const article of articles) {
       const snapshot = await createReview(
         { title: article.title, body: article.body },
-        new DeepSeekReviewModel({ apiKey }),
+        new SingleAttemptDeepSeekReviewModel({ apiKey }),
         {
           promptMode: "copilot",
           useCache: false,
@@ -71,6 +78,9 @@ describe("M3 contaminated regression benchmark (diagnostic, never official locke
       }
       if (provenance.adapter_provider !== "deepseek") {
         throw new Error(`Unexpected adapter provider: ${provenance.adapter_provider}`);
+      }
+      if (provenance.attempt_count > 1) {
+        throw new Error(`Regression article ${article.article_id} exceeded one provider attempt`);
       }
       if (provenance.observed_response_model_status === "observed") {
         assertObservedModelMatchesExpected(provenance, OFFICIAL_BENCHMARK_MODEL);
@@ -124,6 +134,7 @@ describe("M3 contaminated regression benchmark (diagnostic, never official locke
       expected_provider: "deepseek",
       expected_model: OFFICIAL_BENCHMARK_MODEL,
       product_deadline_ms: PRODUCT_REVIEW_DEADLINE_MS,
+      max_provider_attempts_per_article: 1,
       metrics: averageMetrics(rows),
       runtime: aggregateCallSnapshots(runtimes),
       rules_only_article_ids: rulesOnlyArticleIds,
@@ -139,6 +150,7 @@ describe("M3 contaminated regression benchmark (diagnostic, never official locke
     }
     expect(payload.article_ids).toHaveLength(12);
     expect(payload.runtime.logical_calls).toBe(12);
+    expect(payload.runtime.provider_attempt_count).toBeLessThanOrEqual(12);
     expect(payload.runtime.application_cache.hit).toBe(false);
     expect(payload.official).toBe(false);
     expect(payload.may_claim_fresh_locked_generalization).toBe(false);
