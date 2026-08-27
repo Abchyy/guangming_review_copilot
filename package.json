@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:dev-live": "BENCHMARK_DEV_LIVE=1 vitest run --config vitest.live.config.mts tests/live/dev-benchmark.test.ts",
+    "test:regression-live": "BENCHMARK_REGRESSION_LIVE=1 vitest run --config vitest.live.config.mts tests/live/regression-benchmark.test.ts",
     "test:locked": "BENCHMARK_LOCKED=1 vitest run --config vitest.live.config.mts tests/live/locked-benchmark.test.ts",
     "holdout:dry-run": "vitest run tests/benchmark/holdout-protocol.test.ts",
     "holdout:status": "node --env-file=.env.holdout.local scripts/holdout-status.mjs",

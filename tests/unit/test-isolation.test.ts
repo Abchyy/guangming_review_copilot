@@ -21,6 +21,7 @@ import {
   DEV_LIVE_INTENT,
   LOCKED_INTENT,
   LIVE_SMOKE_INTENT,
+  REGRESSION_LIVE_INTENT,
   applyOfflineTestEnv,
   OFFLINE_MODEL_ENV_KEYS,
 } from "@grc/test-kit";
@@ -44,6 +45,7 @@ function productionLikeModelEnv(): Record<string, string> {
     TAVILY_API_KEY: "tvly-prod-like-must-not-be-used",
     WEB_EVIDENCE_ENABLED: "true",
     [DEV_LIVE_INTENT]: "1",
+    [REGRESSION_LIVE_INTENT]: "1",
     [LOCKED_INTENT]: "1",
     [LIVE_SMOKE_INTENT]: "1",
   };
@@ -52,6 +54,7 @@ function productionLikeModelEnv(): Record<string, string> {
 function isolationEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env[DEV_LIVE_INTENT];
+  delete env[REGRESSION_LIVE_INTENT];
   delete env[LOCKED_INTENT];
   delete env[LIVE_SMOKE_INTENT];
   Object.assign(env, {
@@ -191,7 +194,7 @@ describe("test / dev-live / locked isolation", () => {
     expect(leftoverHarness).toEqual([]);
   }, 30_000);
 
-  test("package scripts expose three explicit entries and do not start from API keys", () => {
+  test("package scripts expose explicit live entries and do not start from API keys", () => {
     const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as {
       scripts: Record<string, string>;
     };
@@ -199,6 +202,9 @@ describe("test / dev-live / locked isolation", () => {
     expect(pkg.scripts["test:dev-live"]).toContain("vitest.live.config.mts");
     expect(pkg.scripts["test:dev-live"]).toContain(`${DEV_LIVE_INTENT}=1`);
     expect(pkg.scripts["test:dev-live"]).toContain("tests/live/dev-benchmark.test.ts");
+    expect(pkg.scripts["test:regression-live"]).toContain("vitest.live.config.mts");
+    expect(pkg.scripts["test:regression-live"]).toContain(`${REGRESSION_LIVE_INTENT}=1`);
+    expect(pkg.scripts["test:regression-live"]).toContain("tests/live/regression-benchmark.test.ts");
     expect(pkg.scripts["test:locked"]).toContain("vitest.live.config.mts");
     expect(pkg.scripts["test:locked"]).toContain(`${LOCKED_INTENT}=1`);
     expect(pkg.scripts["test:locked"]).toContain("tests/live/locked-benchmark.test.ts");
@@ -241,6 +247,10 @@ describe("test / dev-live / locked isolation", () => {
         {
           file: "tests/live/dev-benchmark.test.ts",
           flag: DEV_LIVE_INTENT,
+        },
+        {
+          file: "tests/live/regression-benchmark.test.ts",
+          flag: REGRESSION_LIVE_INTENT,
         },
         {
           file: "tests/live/locked-benchmark.test.ts",
