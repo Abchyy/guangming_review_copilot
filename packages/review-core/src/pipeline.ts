@@ -82,6 +82,15 @@ function remainingDeadlineMs(startedAt: number, deadlineMs: number | undefined):
   return Math.max(0, deadlineMs - (Date.now() - startedAt));
 }
 
+/** Copilot may return rules_only with empty findings; baseline and FALLBACK_MODE=fail still throw. */
+function canDegradeToRulesOnly(promptMode: ReviewPromptMode, error: unknown): boolean {
+  return (
+    promptMode === "copilot" &&
+    getFallbackMode() !== "fail" &&
+    !(error instanceof ReviewRequestError)
+  );
+}
+
 function swallowLater(work: Promise<unknown>): void {
   void work.then(
     () => undefined,
@@ -266,12 +275,7 @@ async function createReviewWithSignal(
           : error instanceof ReviewRequestError
             ? error
             : new ReviewProviderError("Review provider unavailable", error);
-      const canDegrade =
-        promptMode === "copilot" &&
-        getFallbackMode() !== "fail" &&
-        ruleHits.length > 0 &&
-        !(providerError instanceof ReviewRequestError);
-      if (!canDegrade) {
+      if (!canDegradeToRulesOnly(promptMode, providerError)) {
         throw providerError;
       }
       fallback = {
@@ -316,11 +320,7 @@ async function createReviewWithSignal(
   try {
     candidates = parseLlmReviewOutput({ candidates: rawCandidates }).candidates;
   } catch (error) {
-    const canDegrade =
-      promptMode === "copilot" &&
-      getFallbackMode() !== "fail" &&
-      ruleHits.length > 0;
-    if (!canDegrade) {
+    if (!canDegradeToRulesOnly(promptMode, error)) {
       throw error;
     }
     fallback = {

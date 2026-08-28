@@ -159,6 +159,8 @@ export function DesktopReviewLayout({
   const unverifiedWebEvidence = hasUnverifiedWebEvidence(webEvidence);
   const specialistRun = review.pipeline.specialist_orchestration ?? null;
   const pendingSpecialistVerification = hasPendingSpecialistVerification(specialistRun);
+  const fallbackEmpty =
+    review.pipeline.fallback?.used === true && review.findings.length === 0;
 
   return (
     <div
@@ -215,7 +217,7 @@ export function DesktopReviewLayout({
           {WEB_EVIDENCE_UNVERIFIED_MESSAGE}。该状态不表示稿件没有问题。
         </p>
       ) : null}
-      {unresolvedCount === 0 ? (
+      {unresolvedCount === 0 && !fallbackEmpty ? (
         <p className="review-complete" role="status" data-testid="review-complete">
           <IconCheck />
           本轮待处理问题已全部处理完毕。
@@ -287,13 +289,21 @@ export function DesktopReviewLayout({
               selectedFindingId={selectedFindingId}
               pendingActionFindingId={pendingActionFindingId}
               revealNonce={listRevealNonce}
-              emptyTitle={unverifiedWebEvidence ? "本轮无正文批注" : undefined}
-              emptyDetail={
-                unverifiedWebEvidence
-                  ? "外部网页证据未能核验，不能视为没有问题。"
-                  : undefined
+              emptyTitle={
+                fallbackEmpty
+                  ? "模型审校未完成"
+                  : unverifiedWebEvidence
+                    ? "本轮无正文批注"
+                    : undefined
               }
-              emptyCaution={unverifiedWebEvidence}
+              emptyDetail={
+                fallbackEmpty
+                  ? "本轮仅完成规则检查，不能视为稿件没有问题"
+                  : unverifiedWebEvidence
+                    ? "外部网页证据未能核验，不能视为没有问题。"
+                    : undefined
+              }
+              emptyCaution={fallbackEmpty || unverifiedWebEvidence}
               onSelectFinding={selectFromList}
               onDecide={(findingId, action) => {
                 void decide(findingId, action);

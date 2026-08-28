@@ -357,6 +357,10 @@ describe("desktop vertical slice mapping", () => {
     );
     expect(screen.getByTestId("article-body").textContent).toContain("第一段有错别字座谈谈会。");
     expect(screen.getByTestId("finding-empty").textContent).toContain("未发现需要提示的问题");
+    expect(screen.getByTestId("finding-empty").className).not.toContain("is-caution");
+    expect(screen.getByTestId("review-complete").textContent).toContain(
+      "本轮待处理问题已全部处理完毕",
+    );
   });
 });
 
@@ -557,6 +561,32 @@ describe("P0 reading mode, filters, evidence, fallback, and mobile sheet", () =>
     expect(screen.getByTestId("findings-sheet-toggle")).toBeTruthy();
   });
 
+  test("empty findings after rules_only fallback are not presented as a clean bill", () => {
+    render(
+      <DesktopReviewLayout
+        review={{
+          ...review,
+          findings: [],
+          pipeline: {
+            ...review.pipeline,
+            located_count: 0,
+            fallback: { used: true, mode: "rules_only", reason: "Review deadline exceeded" },
+          },
+        }}
+        onReviewChange={() => undefined}
+        onReset={() => undefined}
+      />,
+    );
+    expect(screen.queryByTestId("review-complete")).toBeNull();
+    expect(screen.getByTestId("fallback-banner").textContent).toContain("规则结果");
+    const empty = screen.getByTestId("finding-empty");
+    expect(empty.className).toContain("is-caution");
+    expect(empty.textContent).toContain("模型审校未完成");
+    expect(empty.textContent).toContain("本轮仅完成规则检查，不能视为稿件没有问题");
+    expect(empty.textContent).not.toContain("未发现需要提示的问题");
+    expect(empty.textContent).not.toContain("本轮待处理问题已全部处理完毕");
+  });
+
   test("sheet toggle expands and collapses the findings sheet", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -736,8 +766,12 @@ describe("web evidence presentation", () => {
     );
     expect(screen.getByTestId("finding-empty").textContent).toContain("本轮无正文批注");
     expect(screen.getByTestId("finding-empty").textContent).toContain("不能视为没有问题");
+    expect(screen.getByTestId("finding-empty").className).toContain("is-caution");
     expect(screen.getByTestId("finding-empty").textContent).not.toContain(
       "未发现需要提示的问题",
+    );
+    expect(screen.getByTestId("review-complete").textContent).toContain(
+      "本轮待处理问题已全部处理完毕",
     );
   });
 

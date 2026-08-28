@@ -48,6 +48,14 @@ class MalformedModel implements ReviewModel {
   }
 }
 
+class EmptyResponseModel implements ReviewModel {
+  readonly provider = "openai" as const;
+  readonly model = "test-model";
+  review(): Promise<ReviewCandidate[]> {
+    return Promise.reject(new Error("Provider response was empty"));
+  }
+}
+
 describe("POST /api/reviews", () => {
   test("valid POST with fixture provider returns schema-valid findings", async () => {
     const store = new ReviewStore(openReviewDatabase(":memory:"));
@@ -168,16 +176,38 @@ describe("POST /api/reviews", () => {
     expect(malformedPayload.pipeline.fallback?.mode).toBe("rules_only");
   });
 
-  test("provider failure with no rule hits still returns 502", async () => {
+  test("provider failure with no rule hits degrades to empty rules_only instead of 502", async () => {
     const store = new ReviewStore(openReviewDatabase(":memory:"));
-    const handler = createReviewPostHandler(new FailingModel(), store);
-    const response = await handler(
-      jsonRequest("http://localhost/api/reviews", {
-        title: "天气很好",
-        body: "今天没有机构、政策名称或可触发规则的错误。",
-      }),
+    const unavailable = createReviewPostHandler(new FailingModel(), store);
+    const empty = createReviewPostHandler(new EmptyResponseModel(), store);
+    const malformed = createReviewPostHandler(new MalformedModel(), store);
+    const article = {
+      title: "天气很好",
+      body: "今天没有机构、政策名称或可触发规则的错误。",
+    };
+
+    const unavailableResponse = await unavailable(
+      jsonRequest("http://localhost/api/reviews", article),
     );
-    expect(response.status).toBe(502);
+    expect(unavailableResponse.status).toBe(200);
+    const unavailablePayload = createReviewResponseSchema.parse(await unavailableResponse.json());
+    expect(unavailablePayload.pipeline.fallback?.used).toBe(true);
+    expect(unavailablePayload.pipeline.fallback?.mode).toBe("rules_only");
+    expect(unavailablePayload.findings).toEqual([]);
+
+    const emptyResponse = await empty(jsonRequest("http://localhost/api/reviews", article));
+    expect(emptyResponse.status).toBe(200);
+    const emptyPayload = createReviewResponseSchema.parse(await emptyResponse.json());
+    expect(emptyPayload.pipeline.fallback?.used).toBe(true);
+    expect(emptyPayload.pipeline.fallback?.mode).toBe("rules_only");
+    expect(emptyPayload.findings).toEqual([]);
+
+    const malformedResponse = await malformed(jsonRequest("http://localhost/api/reviews", article));
+    expect(malformedResponse.status).toBe(200);
+    const malformedPayload = createReviewResponseSchema.parse(await malformedResponse.json());
+    expect(malformedPayload.pipeline.fallback?.used).toBe(true);
+    expect(malformedPayload.pipeline.fallback?.mode).toBe("rules_only");
+    expect(malformedPayload.findings).toEqual([]);
   });
 });
 

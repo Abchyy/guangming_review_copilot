@@ -138,6 +138,25 @@ describe("product review deadline", () => {
     expect(result.findings.length).toBeGreaterThan(0);
   });
 
+  test("deadline with no rule hits still degrades to empty rules_only", async () => {
+    const model = new IgnoreAbortReviewModel();
+    const started = Date.now();
+    const result = await createReview(
+      {
+        title: "天气很好",
+        body: "今天没有机构、政策名称或可触发规则的错误。",
+      },
+      model,
+      { deadlineMs: 40 },
+    );
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(model.calls).toBe(1);
+    expect(result.pipeline.fallback?.used).toBe(true);
+    expect(result.pipeline.fallback?.mode).toBe("rules_only");
+    expect(result.pipeline.fallback?.reason).toContain("deadline");
+    expect(result.findings).toEqual([]);
+  });
+
   test("deadline aborts remaining web evidence fetches and returns 未能外部核验", async () => {
     let fetches = 0;
     let aborted = false;
