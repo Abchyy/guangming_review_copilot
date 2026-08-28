@@ -18,6 +18,7 @@ import { DeepSeekReviewModel } from "@grc/providers";
 import { OpenAIReviewModel } from "@grc/providers";
 
 import {
+  CHALLENGE_LIVE_INTENT,
   DEV_LIVE_INTENT,
   LOCKED_INTENT,
   LIVE_SMOKE_INTENT,
@@ -45,6 +46,7 @@ function productionLikeModelEnv(): Record<string, string> {
     TAVILY_API_KEY: "tvly-prod-like-must-not-be-used",
     WEB_EVIDENCE_ENABLED: "true",
     [DEV_LIVE_INTENT]: "1",
+    [CHALLENGE_LIVE_INTENT]: "1",
     [REGRESSION_LIVE_INTENT]: "1",
     [LOCKED_INTENT]: "1",
     [LIVE_SMOKE_INTENT]: "1",
@@ -54,6 +56,7 @@ function productionLikeModelEnv(): Record<string, string> {
 function isolationEnv(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env[DEV_LIVE_INTENT];
+  delete env[CHALLENGE_LIVE_INTENT];
   delete env[REGRESSION_LIVE_INTENT];
   delete env[LOCKED_INTENT];
   delete env[LIVE_SMOKE_INTENT];
@@ -202,6 +205,13 @@ describe("test / dev-live / locked isolation", () => {
     expect(pkg.scripts["test:dev-live"]).toContain("vitest.live.config.mts");
     expect(pkg.scripts["test:dev-live"]).toContain(`${DEV_LIVE_INTENT}=1`);
     expect(pkg.scripts["test:dev-live"]).toContain("tests/live/dev-benchmark.test.ts");
+    expect(pkg.scripts["test:challenge-live"]).toContain("vitest.live.config.mts");
+    expect(pkg.scripts["test:challenge-live"]).toContain(`${CHALLENGE_LIVE_INTENT}=1`);
+    expect(pkg.scripts["test:challenge-live"]).toContain("WEB_EVIDENCE_ENABLED=true");
+    expect(pkg.scripts["test:challenge-live"]).toContain("REVIEW_SPECIALISTS_ENABLED=1");
+    expect(pkg.scripts["test:challenge-live"]).toContain(
+      "tests/live/generalization-challenge.test.ts",
+    );
     expect(pkg.scripts["test:regression-live"]).toContain("vitest.live.config.mts");
     expect(pkg.scripts["test:regression-live"]).toContain(`${REGRESSION_LIVE_INTENT}=1`);
     expect(pkg.scripts["test:regression-live"]).toContain("tests/live/regression-benchmark.test.ts");
@@ -247,6 +257,10 @@ describe("test / dev-live / locked isolation", () => {
         {
           file: "tests/live/dev-benchmark.test.ts",
           flag: DEV_LIVE_INTENT,
+        },
+        {
+          file: "tests/live/generalization-challenge.test.ts",
+          flag: CHALLENGE_LIVE_INTENT,
         },
         {
           file: "tests/live/regression-benchmark.test.ts",
