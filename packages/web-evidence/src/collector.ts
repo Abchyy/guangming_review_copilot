@@ -65,18 +65,13 @@ export function createWebEvidenceCollector(
         maxQueries: options.maxQueries ?? WEB_EVIDENCE_MAX_QUERIES_PER_ARTICLE,
         maxResultsPerQuery: options.maxResultsPerQuery ?? WEB_EVIDENCE_MAX_RESULTS_PER_QUERY,
       });
-      const results: WebEvidenceResult[] = [];
-      let started = 0;
-      for (const query of queries) {
-        if (input.signal?.aborted) {
-          break;
-        }
-        started += 1;
-        results.push(await searchSafely(provider, query, now, input.signal));
-      }
+      const startedQueries = input.signal?.aborted ? [] : queries;
+      const results = await Promise.all(
+        startedQueries.map((query) => searchSafely(provider, query, now, input.signal)),
+      );
       return parseWebEvidenceRun({
         enabled: true,
-        query_count: started,
+        query_count: startedQueries.length,
         results,
       });
     },

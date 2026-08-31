@@ -35,6 +35,7 @@ export type SpecialistCompletionInput = {
   maxAttempts?: number;
   maxRetries?: number;
   timeoutMs?: number;
+  fallbackToTextJson?: boolean;
 };
 
 export type SpecialistCompletionClient = {
@@ -276,15 +277,19 @@ export class ModelSpecialist implements Specialist {
       preliminaryFindings: task.preliminaryFindings.filter((item) => allowedTypes.has(item.type)),
     };
     const user = buildSpecialistUserPrompt(promptTask);
+    const allowedTypeInstruction = `本次 candidates.type 只允许使用：${[
+      ...allowedTypes,
+    ].join(", ")}。每条 candidate 必须完整包含 type、severity、title、reason、suggestion{text,replacement}、confidence、evidence 数组，以及 source{field,exact_quote,paragraph_index,context_before,context_after}；nullable 字段也必须显式输出 null。`;
     try {
       const raw = await this.client.completeJson({
-        system: SPECIALIST_ROLE_PROMPTS[this.id],
+        system: `${SPECIALIST_ROLE_PROMPTS[this.id]}\n\n${allowedTypeInstruction}`,
         user,
         signal: options.signal,
         maxTokens: SPECIALIST_MAX_TOKENS,
         maxAttempts: SPECIALIST_MAX_ATTEMPTS,
         maxRetries: SPECIALIST_SDK_MAX_RETRIES,
         timeoutMs: SPECIALIST_REQUEST_TIMEOUT_MS,
+        fallbackToTextJson: true,
       });
       const execution = this.client.consumeLastProvenance?.() ?? null;
       const candidates = sanitizeSpecialistCandidates(this.id, task, raw);
@@ -333,7 +338,14 @@ function isAbortLike(error: unknown): boolean {
     }
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /aborted|timed out|timeout/i.test(message);
+  if (/aborted|timed out|timeout/i.test(message)) {
+    return true;
+  }
+  if (typeof error === "object" && error !== null && "cause" in error) {
+    const cause = (error as { cause?: unknown }).cause;
+    return cause !== error && isAbortLike(cause);
+  }
+  return false;
 }
 
 function messageOf(error: unknown): string {

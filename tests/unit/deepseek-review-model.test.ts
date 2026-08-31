@@ -82,20 +82,23 @@ describe("DeepSeek review model", () => {
       model: string;
       max_tokens: number;
       response_format: { type: string };
-      extra_body: { thinking: { type: string } };
+      thinking: { type: string };
+      stream: boolean;
       messages: Array<{ content: string }>;
     };
     expect(arg.model).toBe("deepseek-v4-flash");
     expect(arg.max_tokens).toBe(DEEPSEEK_RETRY_POLICY.max_tokens);
     expect(arg.response_format).toEqual({ type: "json_object" });
-    expect(arg.extra_body.thinking.type).toBe("disabled");
+    expect(arg.thinking.type).toBe("disabled");
+    expect(arg.stream).toBe(false);
+    expect(arg).not.toHaveProperty("extra_body");
     expect(create.mock.calls[0]?.[1]).toBeUndefined();
     expect(arg.messages[0]?.content.toLowerCase()).toContain("json");
     expect(arg.messages[0]?.content).not.toContain(PRODUCT_JSON_COMPACT_INSTRUCTION);
     expect(parseLlmReviewOutput({ candidates }).candidates).toHaveLength(1);
   });
 
-  test("product review uses a compact JSON budget without changing official retry max_tokens", async () => {
+  test("product review uses the expanded JSON budget without changing official retry max_tokens", async () => {
     const create = vi.fn().mockResolvedValue({
       choices: [{ message: { content: JSON.stringify(validOutput) } }],
     });
@@ -105,15 +108,142 @@ describe("DeepSeek review model", () => {
     });
     await model.review(
       { title: "标题", body: "座谈谈会", version: 1 },
-      { maxTokens: 3072 },
+      {
+        maxTokens: 12_288,
+        maxAttempts: 2,
+        maxRetries: 0,
+        fallbackToTextJson: true,
+      },
     );
     const arg = create.mock.calls[0]?.[0] as {
       max_tokens: number;
       messages: Array<{ content: string }>;
     };
-    expect(arg.max_tokens).toBe(3072);
+    expect(arg.max_tokens).toBe(12_288);
     expect(arg.messages[0]?.content).toContain(PRODUCT_JSON_COMPACT_INSTRUCTION);
+    expect(arg.messages[0]?.content).toContain("最多输出 20 条");
+    expect(create.mock.calls[0]?.[1]).toMatchObject({ maxRetries: 0 });
     expect(DEEPSEEK_RETRY_POLICY.max_tokens).toBe(8192);
+  });
+
+  test("product review recovers from empty JSON mode with a plain-text JSON retry", async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({ choices: [{ message: { content: "" } }] })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: `\`\`\`json\n${JSON.stringify(validOutput)}\n\`\`\`` } }],
+      });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+    const candidates = await model.review(
+      { title: "标题", body: "正文", version: 1 },
+      {
+        maxTokens: 12_288,
+        maxAttempts: 2,
+        maxRetries: 0,
+        fallbackToTextJson: true,
+      },
+    );
+    expect(candidates).toHaveLength(1);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      max_tokens: 12_288,
+      response_format: { type: "json_object" },
+    });
+    expect(create.mock.calls[1]?.[0]).not.toHaveProperty("response_format");
+    expect(create.mock.calls[1]?.[0]).toMatchObject({
+      max_tokens: 8192,
+      thinking: { type: "disabled" },
+      stream: false,
+    });
+    expect(create.mock.calls[1]?.[1]).toMatchObject({ maxRetries: 0 });
+    const retryMessages = (create.mock.calls[1]?.[0] as { messages: Array<{ content: string }> })
+      .messages;
+    expect(retryMessages[0]?.content).toContain("上一次 JSON Output 未返回可解析内容");
+    expect(model.consumeLastProvenance()?.attempt_count).toBe(2);
+  });
+
+  test("treats a length-truncated JSON response as retryable and switches to compact recovery", async () => {
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce({
+        model: "deepseek-v4-flash",
+        choices: [{ finish_reason: "length", message: { content: '{"candidates":[' } }],
+        usage: { prompt_tokens: 100, completion_tokens: 12_288 },
+      })
+      .mockResolvedValueOnce({
+        model: "deepseek-v4-flash",
+        choices: [{ finish_reason: "stop", message: { content: JSON.stringify(validOutput) } }],
+        usage: { prompt_tokens: 110, completion_tokens: 500 },
+      });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+
+    const candidates = await model.review(
+      { title: "标题", body: "正文", version: 1 },
+      {
+        maxTokens: 12_288,
+        maxAttempts: 2,
+        maxRetries: 0,
+        fallbackToTextJson: true,
+      },
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(create.mock.calls[1]?.[0]).toMatchObject({ max_tokens: 8192 });
+    const retrySystem = (create.mock.calls[1]?.[0] as {
+      messages: Array<{ content: string }>;
+    }).messages[0]?.content;
+    expect(retrySystem).toContain("紧凑恢复");
+    expect(model.consumeLastProvenance()?.attempts[0]?.error).toBe(
+      "Provider response JSON was truncated",
+    );
+  });
+
+  test("repairs safe candidate shape differences and drops irreparable siblings", async () => {
+    const repairable = {
+      ...validOutput.candidates[0],
+      confidence: "0.8",
+      suggestion: { text: "建议人工核实" },
+      evidence: [{ kind: "unsupported_kind", excerpt: "测试" }],
+      source: {
+        field: "body",
+        quoted_text: "座谈谈会",
+        paragraph_index: "0",
+      },
+    };
+    const create = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({ candidates: [repairable, { type: "unknown" }] }),
+          },
+        },
+      ],
+    });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+
+    const candidates = await model.review({ title: "标题", body: "座谈谈会", version: 1 });
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      confidence: 0.8,
+      suggestion: { text: "建议人工核实", replacement: null },
+      evidence: [{ kind: "ai_judgment", excerpt: "测试", citation_validated: false }],
+      source: {
+        field: "body",
+        exact_quote: "座谈谈会",
+        paragraph_index: 0,
+        context_before: null,
+        context_after: null,
+      },
+    });
   });
 
   test("retries once on malformed JSON then passes", async () => {
@@ -151,6 +281,8 @@ describe("DeepSeek review model", () => {
     });
     expect(create.mock.calls[0]?.[0]).toMatchObject({ max_tokens: 8192 });
     expect(create.mock.calls[1]?.[0]).toMatchObject({ max_tokens: 8192 });
+    expect(create.mock.calls[0]?.[0]).toHaveProperty("response_format");
+    expect(create.mock.calls[1]?.[0]).toHaveProperty("response_format");
     expect(create.mock.calls[0]?.[1]).toBeUndefined();
     expect(create.mock.calls[1]?.[1]).toBeUndefined();
     const provenance = model.consumeLastProvenance();
@@ -208,13 +340,70 @@ describe("DeepSeek review model", () => {
       model.review({ title: "标题", body: "座谈谈会", version: 1 }),
     ).rejects.toBeInstanceOf(ReviewProviderError);
     const provenance = model.consumeLastProvenance();
-    expect(create).toHaveBeenCalledTimes(1);
-    expect(provenance?.attempts).toHaveLength(1);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(provenance?.attempts).toHaveLength(2);
     expect(provenance?.attempts[0]?.received_provider_response).toBe(false);
     expect(provenance?.aggregated_usage.input_tokens).toBeNull();
     expect(provenance?.aggregated_usage.input_tokens_completeness).toBe("incomplete");
     expect(provenance?.observed_response_model).toBeNull();
     expect(provenance?.observed_response_model_status).toBe("not_reported");
+  });
+
+  test("retries an observable request timeout without hidden SDK retries", async () => {
+    const timeout = Object.assign(new Error("Request timed out"), {
+      name: "APIConnectionTimeoutError",
+    });
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(timeout)
+      .mockResolvedValueOnce({
+        model: "deepseek-v4-flash",
+        choices: [{ message: { content: JSON.stringify(validOutput) } }],
+      });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+
+    const candidates = await model.review(
+      { title: "标题", body: "座谈谈会", version: 1 },
+      { maxAttempts: 2, maxRetries: 0, timeoutMs: 150_000 },
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[0]?.[1]).toMatchObject({ maxRetries: 0, timeout: 150_000 });
+    const provenance = model.consumeLastProvenance();
+    expect(provenance?.attempt_count).toBe(2);
+    expect(provenance?.attempts[0]).toMatchObject({
+      outcome: "retryable_failure",
+      received_provider_response: false,
+      error: "DeepSeek request timed out",
+    });
+    expect(provenance?.attempts[1]?.outcome).toBe("success");
+  });
+
+  test("records HTTP 429 distinctly before a bounded retry", async () => {
+    const rateLimit = Object.assign(new Error("rate limit"), { status: 429 });
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(rateLimit)
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(validOutput) } }],
+      });
+    const model = new DeepSeekReviewModel({
+      apiKey: "sk-test",
+      client: { chat: { completions: { create } } } as never,
+    });
+
+    await model.review(
+      { title: "标题", body: "座谈谈会", version: 1 },
+      { maxAttempts: 2, maxRetries: 0 },
+    );
+
+    expect(model.consumeLastProvenance()?.attempts[0]?.error).toBe(
+      "DeepSeek rate limited (HTTP 429)",
+    );
   });
 
   test("does not report a complete usage total when an earlier retry attempt omits usage", async () => {

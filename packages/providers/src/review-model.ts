@@ -22,6 +22,9 @@ export type ReviewPromptContext = {
   signal?: AbortSignal;
   timeoutMs?: number;
   maxTokens?: number;
+  maxAttempts?: number;
+  maxRetries?: number;
+  fallbackToTextJson?: boolean;
 };
 
 export type ProviderCallUsage = {
@@ -39,6 +42,7 @@ export type SpecialistJsonCompletion = {
   maxAttempts?: number;
   maxRetries?: number;
   timeoutMs?: number;
+  fallbackToTextJson?: boolean;
 };
 
 export interface ReviewModel {

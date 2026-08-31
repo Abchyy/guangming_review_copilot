@@ -39,6 +39,7 @@ import {
   assertSliceEqualsQuotedText,
 } from "./span-locator";
 import { buildCandidateCacheKey, hashCanonicalArticle } from "./article-hash";
+import { buildFallbackRiskFindings } from "./fallback-risk";
 import { getCorpusVersion } from "@grc/retrieval";
 import { materializeLlmEvidence, ruleHitToFindingDraft } from "./evidence";
 import { fuseFindings, type DraftFinding } from "./fusion";
@@ -63,16 +64,33 @@ export type CreateReviewOptions = {
 };
 
 /** Product reviews must finish or degrade under the Next.js route cap. */
-export const PRODUCT_REVIEW_DEADLINE_MS = 55_000;
-export const PRODUCT_REVIEW_MAX_ELAPSED_MS = 60_000;
+export const PRODUCT_REVIEW_DEADLINE_MS = 470_000;
+export const PRODUCT_REVIEW_MAX_ELAPSED_MS = 480_000;
 /** Product main-review output budget. Official holdout still uses DEEPSEEK_RETRY_POLICY.max_tokens. */
-export const PRODUCT_REVIEW_MAX_TOKENS = 3072;
+export const PRODUCT_REVIEW_MAX_TOKENS = 12_288;
+export const PRODUCT_REVIEW_MAX_CANDIDATES = 20;
+export const PRODUCT_REVIEW_MAX_ATTEMPTS = 2;
+export const PRODUCT_REVIEW_SDK_MAX_RETRIES = 0;
+export const PRODUCT_MAIN_REVIEW_BUDGET_MS = 300_000;
+export const PRODUCT_MAIN_REVIEW_ATTEMPT_TIMEOUT_MS = 150_000;
+export const PRODUCT_WEB_EVIDENCE_BUDGET_MS = 10_000;
+export const PRODUCT_SPECIALIST_BUDGET_MS = 150_000;
+const PRODUCT_PHASE_BUDGET_TOTAL_MS =
+  PRODUCT_MAIN_REVIEW_BUDGET_MS +
+  PRODUCT_WEB_EVIDENCE_BUDGET_MS +
+  PRODUCT_SPECIALIST_BUDGET_MS;
 /** Leave time to assemble the response after abort so wall clock stays ≤ deadline. */
-export const PRODUCT_REVIEW_SETTLE_MS = 400;
+export const PRODUCT_REVIEW_SETTLE_MS = 1_000;
 
 export function productAbortAtMs(deadlineMs: number): number {
   const settle = Math.min(PRODUCT_REVIEW_SETTLE_MS, Math.max(0, Math.trunc(deadlineMs / 4)));
   return Math.max(0, deadlineMs - settle);
+}
+
+export function productPhaseBudgetMs(configuredBudgetMs: number, deadlineMs: number): number {
+  const usableMs = productAbortAtMs(deadlineMs);
+  const scale = Math.min(1, usableMs / PRODUCT_PHASE_BUDGET_TOTAL_MS);
+  return Math.max(0, Math.floor(configuredBudgetMs * scale));
 }
 
 function remainingDeadlineMs(startedAt: number, deadlineMs: number | undefined): number | undefined {
@@ -82,6 +100,28 @@ function remainingDeadlineMs(startedAt: number, deadlineMs: number | undefined):
   return Math.max(0, deadlineMs - (Date.now() - startedAt));
 }
 
+function remainingPhaseBudgetMs(
+  startedAt: number,
+  deadlineMs: number | undefined,
+  configuredBudgetMs: number,
+): number | undefined {
+  if (deadlineMs == null) {
+    return undefined;
+  }
+  return Math.min(
+    productPhaseBudgetMs(configuredBudgetMs, deadlineMs),
+    remainingDeadlineMs(startedAt, deadlineMs) ?? 0,
+  );
+}
+
+function canDegradeToRulesOnly(promptMode: ReviewPromptMode, error: unknown): boolean {
+  return (
+    promptMode === "copilot" &&
+    getFallbackMode() !== "fail" &&
+    !(error instanceof ReviewRequestError)
+  );
+}
+
 function swallowLater(work: Promise<unknown>): void {
   void work.then(
     () => undefined,
@@ -89,44 +129,50 @@ function swallowLater(work: Promise<unknown>): void {
   );
 }
 
-function raceAbort<T>(
+/** Give abort-aware collectors one event-loop turn to return their own per-query status. */
+function raceAbortAfterTurn<T>(
   work: Promise<T>,
   signal: AbortSignal | undefined,
   onAbort: () => T,
 ): Promise<T> {
-  if (!signal) {
-    return work;
-  }
-  if (signal.aborted) {
-    swallowLater(work);
-    return Promise.resolve().then(onAbort);
-  }
-  return new Promise<T>((resolve, reject) => {
-    let settled = false;
-    const finish = (apply: () => void) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      signal.removeEventListener("abort", abort);
-      apply();
-    };
-    const abort = () => {
-      swallowLater(work);
-      finish(() => {
-        try {
-          resolve(onAbort());
-        } catch (error) {
-          reject(error);
+  if (!signal || !signal.aborted) {
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (apply: () => void) => {
+        if (settled) {
+          return;
         }
-      });
-    };
-    signal.addEventListener("abort", abort, { once: true });
-    work.then(
-      (value) => finish(() => resolve(value)),
-      (error) => finish(() => reject(error)),
-    );
-  });
+        settled = true;
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+        signal?.removeEventListener("abort", abort);
+        apply();
+      };
+      const abort = () => {
+        swallowLater(work);
+        timer = setTimeout(
+          () =>
+            finish(() => {
+              try {
+                resolve(onAbort());
+              } catch (error) {
+                reject(error);
+              }
+            }),
+          0,
+        );
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      work.then(
+        (value) => finish(() => resolve(value)),
+        (error) => finish(() => reject(error)),
+      );
+    });
+  }
+  swallowLater(work);
+  return Promise.resolve().then(onAbort);
 }
 
 function linkReviewAbort(options: { deadlineMs?: number; signal?: AbortSignal }): {
@@ -155,6 +201,33 @@ function linkReviewAbort(options: { deadlineMs?: number; signal?: AbortSignal })
         clearTimeout(timer);
       }
       options.signal?.removeEventListener("abort", onParentAbort);
+    },
+  };
+}
+
+function linkPhaseAbort(parent: AbortSignal, timeoutMs: number | undefined): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const abort = () => {
+    if (!controller.signal.aborted) {
+      controller.abort();
+    }
+  };
+  if (parent.aborted || timeoutMs === 0) {
+    abort();
+  } else {
+    parent.addEventListener("abort", abort, { once: true });
+  }
+  const timer = timeoutMs != null && timeoutMs > 0 ? setTimeout(abort, timeoutMs) : undefined;
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      parent.removeEventListener("abort", abort);
     },
   };
 }
@@ -233,9 +306,23 @@ async function createReviewWithSignal(
   }
 
   if (!cacheHit) {
+    const mainPhaseBudgetMs = remainingPhaseBudgetMs(
+      startedAt,
+      options.deadlineMs,
+      PRODUCT_MAIN_REVIEW_BUDGET_MS,
+    );
+    const mainAbort = linkPhaseAbort(signal, mainPhaseBudgetMs);
     try {
-      const modelTimeoutMs = remainingDeadlineMs(startedAt, options.deadlineMs);
-      if (signal.aborted || modelTimeoutMs === 0) {
+      const remainingMainMs =
+        mainPhaseBudgetMs ?? remainingDeadlineMs(startedAt, options.deadlineMs);
+      const modelTimeoutMs =
+        options.deadlineMs == null
+          ? remainingMainMs
+          : Math.min(
+              remainingMainMs ?? PRODUCT_MAIN_REVIEW_ATTEMPT_TIMEOUT_MS,
+              PRODUCT_MAIN_REVIEW_ATTEMPT_TIMEOUT_MS,
+            );
+      if (mainAbort.signal.aborted || modelTimeoutMs === 0) {
         throw new ReviewProviderError("Review deadline exceeded");
       }
       const reviewWork = model.review(article, {
@@ -252,13 +339,24 @@ async function createReviewWithSignal(
           excerpt: item.excerpt,
         })),
         ...(options.deadlineMs != null || options.signal
-          ? { signal, timeoutMs: modelTimeoutMs }
+          ? { signal: mainAbort.signal, timeoutMs: modelTimeoutMs }
           : {}),
-        ...(options.deadlineMs != null ? { maxTokens: PRODUCT_REVIEW_MAX_TOKENS } : {}),
+        ...(options.deadlineMs != null
+          ? {
+              maxTokens: PRODUCT_REVIEW_MAX_TOKENS,
+              maxAttempts: PRODUCT_REVIEW_MAX_ATTEMPTS,
+              maxRetries: PRODUCT_REVIEW_SDK_MAX_RETRIES,
+              fallbackToTextJson: true,
+            }
+          : {}),
       });
-      rawCandidates = await raceAbort(reviewWork, options.deadlineMs != null || options.signal ? signal : undefined, () => {
-        throw new ReviewProviderError("Review deadline exceeded");
-      });
+      rawCandidates = await raceAbortAfterTurn(
+        reviewWork,
+        options.deadlineMs != null || options.signal ? mainAbort.signal : undefined,
+        () => {
+          throw new ReviewProviderError("Review deadline exceeded");
+        },
+      );
     } catch (error) {
       const providerError =
         error instanceof ReviewProviderError
@@ -266,12 +364,7 @@ async function createReviewWithSignal(
           : error instanceof ReviewRequestError
             ? error
             : new ReviewProviderError("Review provider unavailable", error);
-      const canDegrade =
-        promptMode === "copilot" &&
-        getFallbackMode() !== "fail" &&
-        ruleHits.length > 0 &&
-        !(providerError instanceof ReviewRequestError);
-      if (!canDegrade) {
+      if (!canDegradeToRulesOnly(promptMode, providerError)) {
         throw providerError;
       }
       fallback = {
@@ -280,6 +373,8 @@ async function createReviewWithSignal(
         reason: providerError.message,
       };
       rawCandidates = [];
+    } finally {
+      mainAbort.cleanup();
     }
     if (cache && !fallback.used && Array.isArray(rawCandidates)) {
       cache.set(cacheKey, {
@@ -308,6 +403,12 @@ async function createReviewWithSignal(
             adapterProvider: model.provider,
             requestedModel: model.model,
             applicationCache,
+            ...(fallback.used
+              ? {
+                  failureError: fallback.reason ?? "Review provider unavailable",
+                  failureLatencyMs: Date.now() - startedAt,
+                }
+              : {}),
           }),
         applicationCache,
       );
@@ -316,11 +417,7 @@ async function createReviewWithSignal(
   try {
     candidates = parseLlmReviewOutput({ candidates: rawCandidates }).candidates;
   } catch (error) {
-    const canDegrade =
-      promptMode === "copilot" &&
-      getFallbackMode() !== "fail" &&
-      ruleHits.length > 0;
-    if (!canDegrade) {
+    if (!canDegradeToRulesOnly(promptMode, error)) {
       throw error;
     }
     fallback = {
@@ -329,7 +426,10 @@ async function createReviewWithSignal(
       reason: error instanceof Error ? error.message : "Provider output failed schema validation",
     };
   }
-  const limited = candidates.slice(0, 20);
+  const limited = candidates.slice(
+    0,
+    options.deadlineMs != null ? PRODUCT_REVIEW_MAX_CANDIDATES : 20,
+  );
   const llmDrafts: DraftFinding[] = [];
   let dropped = 0;
 
@@ -357,7 +457,10 @@ async function createReviewWithSignal(
   }
 
   const ruleDrafts = ruleHits.map(ruleHitToFindingDraft);
-  const fused = promptMode === "baseline" ? llmDrafts : fuseFindings(ruleDrafts, llmDrafts);
+  const fallbackRiskDrafts = fallback.used ? buildFallbackRiskFindings(article) : [];
+  const deterministicDrafts = [...ruleDrafts, ...fallbackRiskDrafts];
+  const fused =
+    promptMode === "baseline" ? llmDrafts : fuseFindings(deterministicDrafts, llmDrafts);
   const overridden = applySeverityOverrides(fused);
   const ranked = rankFindings(overridden);
   const findings: Finding[] = ranked.map((item, index) =>
@@ -367,32 +470,50 @@ async function createReviewWithSignal(
     }),
   );
 
-  const webEvidence = await collectWebEvidence(
-    options.webEvidenceCollector,
-    article,
-    findings,
+  const webAbort = linkPhaseAbort(
     signal,
+    remainingPhaseBudgetMs(startedAt, options.deadlineMs, PRODUCT_WEB_EVIDENCE_BUDGET_MS),
   );
+  let webEvidence: WebEvidenceRun | undefined;
+  try {
+    webEvidence = await collectWebEvidence(
+      options.webEvidenceCollector,
+      article,
+      findings,
+      webAbort.signal,
+    );
+  } finally {
+    webAbort.cleanup();
+  }
 
-  const specialistRun = await runSpecialists(
-    options.specialistRuntime,
-    article,
-    findings,
-    retrieved.map((item) => ({
-      source_id: item.source_id,
-      source_name: item.source_name,
-      source_url: item.source_url,
-      authority_level: item.authority_level,
-      published_at: item.published_at,
-      valid_from: item.valid_from,
-      valid_to: item.valid_to,
-      excerpt: item.excerpt,
-      match_rank: item.match_rank,
-      trigger: item.trigger,
-    })),
-    webEvidence,
+  const specialistAbort = linkPhaseAbort(
     signal,
+    remainingPhaseBudgetMs(startedAt, options.deadlineMs, PRODUCT_SPECIALIST_BUDGET_MS),
   );
+  let specialistRun: SpecialistOrchestrationRun | undefined;
+  try {
+    specialistRun = await runSpecialists(
+      options.specialistRuntime,
+      article,
+      findings,
+      retrieved.map((item) => ({
+        source_id: item.source_id,
+        source_name: item.source_name,
+        source_url: item.source_url,
+        authority_level: item.authority_level,
+        published_at: item.published_at,
+        valid_from: item.valid_from,
+        valid_to: item.valid_to,
+        excerpt: item.excerpt,
+        match_rank: item.match_rank,
+        trigger: item.trigger,
+      })),
+      webEvidence,
+      specialistAbort.signal,
+    );
+  } finally {
+    specialistAbort.cleanup();
+  }
   const finalized = specialistRun
     ? applySpecialistJudgments(findings, specialistRun)
     : findings;
@@ -433,7 +554,7 @@ async function collectWebEvidence(
   }
   try {
     return parseWebEvidenceRun(
-      await raceAbort(collector.collect({ article, findings, signal }), signal, () => ({
+      await raceAbortAfterTurn(collector.collect({ article, findings, signal }), signal, () => ({
         enabled: true as const,
         query_count: 0,
         results: [],

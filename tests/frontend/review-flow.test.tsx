@@ -357,6 +357,7 @@ describe("desktop vertical slice mapping", () => {
     );
     expect(screen.getByTestId("article-body").textContent).toContain("第一段有错别字座谈谈会。");
     expect(screen.getByTestId("finding-empty").textContent).toContain("未发现需要提示的问题");
+    expect(screen.getByTestId("review-complete")).toBeTruthy();
   });
 });
 
@@ -557,6 +558,26 @@ describe("P0 reading mode, filters, evidence, fallback, and mobile sheet", () =>
     expect(screen.getByTestId("findings-sheet-toggle")).toBeTruthy();
   });
 
+  test("an empty fallback does not look like a clean bill", () => {
+    render(
+      <Harness
+        initial={{
+          ...review,
+          findings: [],
+          pipeline: {
+            ...review.pipeline,
+            located_count: 0,
+            fallback: { used: true, mode: "rules_only", reason: "upstream unavailable" },
+          },
+        }}
+      />,
+    );
+    expect(screen.queryByTestId("review-complete")).toBeNull();
+    expect(screen.getByTestId("finding-empty").textContent).toContain("模型审校未完成");
+    expect(screen.getByTestId("finding-empty").textContent).toContain("不能视为稿件没有问题");
+    expect(screen.getByTestId("finding-empty").textContent).not.toContain("未发现需要提示的问题");
+  });
+
   test("sheet toggle expands and collapses the findings sheet", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -721,6 +742,26 @@ describe("web evidence presentation", () => {
     expect(screen.getByTestId("finding-finding-001").textContent).toContain("测试依据");
   });
 
+  test("mixed retrieval reports partial coverage without hiding successful evidence", () => {
+    render(
+      <Harness
+        initial={withWebEvidence([retrievedEvidence(), unverifiedEvidence()])}
+      />,
+    );
+
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      "部分事实未能外部核验",
+    );
+    expect(screen.getByTestId("web-evidence-banner").textContent).toContain(
+      "已保留成功返回的网页证据",
+    );
+    expect(screen.getByTestId("web-evidence-status").textContent).toBe("部分已返回");
+    expect(screen.getByTestId("web-evidence-panel").textContent).toContain("中国政府网");
+    expect(screen.getByTestId("web-evidence-unverified-1").textContent).toContain(
+      WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+    );
+  });
+
   test("empty findings with unverified evidence do not look like a clean bill", () => {
     render(
       <Harness
@@ -804,17 +845,22 @@ describe("compact web evidence sheet", () => {
     expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
   });
 
-  test("expanding the compact sheet reveals evidence fields and keeps filters", async () => {
+  test("expanded compact sheet gives web evidence and findings separate readable tabs", async () => {
     const user = userEvent.setup();
     render(<Harness initial={withWebEvidence([retrievedEvidence()])} />);
     await waitForCompactLayout();
     await user.click(screen.getByTestId("findings-sheet-toggle"));
     expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(false);
+    expect(screen.getByTestId("result-panel-findings").hidden).toBe(false);
+    await user.click(screen.getByTestId("result-tab-web"));
+    expect(screen.getByTestId("result-panel-web").hidden).toBe(false);
     expect(screen.getByTestId("web-evidence-panel").textContent).toContain("中国政府网");
     expect(screen.getByTestId("web-evidence-panel").textContent).toContain("来源等级");
     expect(screen.getByRole("link").getAttribute("href")).toBe(
       "https://www.gov.cn/example/wanghaitao",
     );
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+    await user.click(screen.getByTestId("result-tab-findings"));
     expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
     expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
   });
@@ -997,17 +1043,21 @@ describe("compact specialist orchestration sheet", () => {
     expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
   });
 
-  test("expanding the compact sheet reveals specialist results and keeps findings readable", async () => {
+  test("expanded compact sheet gives specialist results and findings separate readable tabs", async () => {
     const user = userEvent.setup();
     render(<Harness initial={withSpecialistOrchestration(specialistRun())} />);
     await waitForCompactLayout();
     await user.click(screen.getByTestId("findings-sheet-toggle"));
     expect(screen.getByTestId("findings-sheet-panel").hidden).toBe(false);
+    await user.click(screen.getByTestId("result-tab-specialists"));
+    expect(screen.getByTestId("result-panel-specialists").hidden).toBe(false);
     expect(screen.getByTestId("specialist-orchestration-panel").textContent).toContain(
       PERSON_QUOTE,
     );
     expect(screen.getByTestId("specialist-orchestration-panel").textContent).toContain("证据");
     expect(screen.getByRole("link").getAttribute("href")).toBe("https://example.invalid/edu");
+    expect(screen.queryByRole("combobox", { name: "风险" })).toBeNull();
+    await user.click(screen.getByTestId("result-tab-findings"));
     expect(screen.getByRole("combobox", { name: "风险" })).toBeTruthy();
     expect(screen.getByTestId("finding-finding-001")).toBeTruthy();
   });

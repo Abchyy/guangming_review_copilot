@@ -299,6 +299,78 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.findings-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-card);
+}
+
+.findings-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.findings-tab strong {
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(96, 90, 81, 0.1);
+  color: inherit;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.findings-tab[aria-selected="true"] {
+  border-color: var(--line-strong);
+  background: var(--paper-inset);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.findings-tab[aria-selected="true"] strong {
+  background: var(--accent-tint);
+  color: var(--accent-deep);
+}
+
+.findings-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.result-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.result-panel[hidden] {
+  display: none;
+}
+
+.result-panel-specialists > .specialist-orchestration-panel,
+.result-panel-web > .web-evidence-panel {
+  flex: 1;
+  max-height: none;
+  border-bottom: 0;
+}
+
 /* ---------- 网页证据 ---------- */
 
 .web-evidence-panel {
@@ -341,7 +413,8 @@ button {
   background: rgba(96, 90, 81, 0.12);
 }
 
-.web-evidence-status-pill.status-unverified {
+.web-evidence-status-pill.status-unverified,
+.web-evidence-status-pill.status-partial {
   color: var(--gold);
   background: var(--gold-tint);
 }

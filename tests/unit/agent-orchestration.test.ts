@@ -13,6 +13,7 @@ import type {
 } from "@grc/contracts";
 import {
   MODEL_SPECIALIST_IDS,
+  ReviewProviderError,
   SPECIALIST_MAX_PER_ARTICLE,
   parseSpecialistResult,
   specialistOrchestrationRunSchema,
@@ -975,13 +976,14 @@ describe("DeepSeek specialist adapter", () => {
     ]);
   });
 
-  test("model specialists use a single attempt, 12s request timeout, 15s deadline, and a smaller candidate budget", async () => {
+  test("model specialists use relaxed retry, timeout, output, and candidate budgets", async () => {
     const calls: Array<{
       maxTokens?: number;
       maxAttempts?: number;
       maxRetries?: number;
       timeoutMs?: number;
       signal?: AbortSignal;
+      fallbackToTextJson?: boolean;
     }> = [];
     const tasks: SpecialistTask[] = [];
     const inner = createModelSpecialists(() => ({
@@ -1006,24 +1008,25 @@ describe("DeepSeek specialist adapter", () => {
       findings: [personFinding, consistencyFinding],
     });
 
-    expect(DEFAULT_MODEL_SPECIALIST_DEADLINE_MS).toBe(15_000);
-    expect(SPECIALIST_REQUEST_TIMEOUT_MS).toBe(12_000);
-    expect(DEFAULT_SPECIALIST_MAX_CANDIDATES).toBe(3);
-    expect(SPECIALIST_MAX_TOKENS).toBe(2048);
-    expect(SPECIALIST_MAX_ATTEMPTS).toBe(1);
+    expect(DEFAULT_MODEL_SPECIALIST_DEADLINE_MS).toBe(140_000);
+    expect(SPECIALIST_REQUEST_TIMEOUT_MS).toBe(120_000);
+    expect(DEFAULT_SPECIALIST_MAX_CANDIDATES).toBe(8);
+    expect(SPECIALIST_MAX_TOKENS).toBe(16_384);
+    expect(SPECIALIST_MAX_ATTEMPTS).toBe(2);
     expect(SPECIALIST_SDK_MAX_RETRIES).toBe(0);
     expect(run.dispatched).toEqual(["fact_check", "news_edit"]);
     expect(tasks).toHaveLength(2);
-    expect(tasks.every((task) => task.constraints.deadlineMs === 15_000)).toBe(true);
-    expect(tasks.every((task) => task.constraints.maxCandidates === 3)).toBe(true);
+    expect(tasks.every((task) => task.constraints.deadlineMs === 140_000)).toBe(true);
+    expect(tasks.every((task) => task.constraints.maxCandidates === 8)).toBe(true);
     expect(calls).toHaveLength(2);
     expect(
       calls.every(
         (item) =>
-          item.maxAttempts === 1 &&
+          item.maxAttempts === 2 &&
           item.maxRetries === 0 &&
-          item.maxTokens === 2048 &&
-          item.timeoutMs === 12_000 &&
+          item.maxTokens === 16_384 &&
+          item.timeoutMs === 120_000 &&
+          item.fallbackToTextJson === true &&
           item.signal instanceof AbortSignal,
       ),
     ).toBe(true);
@@ -1074,6 +1077,28 @@ describe("DeepSeek specialist adapter", () => {
             item.reason === SPECIALIST_PARTIAL_FAILURE_MESSAGE),
       ),
     ).toBe(true);
+  });
+
+  test("a wrapped provider abort is classified as specialist timeout", async () => {
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        return Promise.reject(
+          new ReviewProviderError(
+            "DeepSeek provider unavailable",
+            new DOMException("Aborted", "AbortError"),
+          ),
+        );
+      },
+    }));
+    const run = await createSpecialistRuntime(specialists).orchestrate({
+      article,
+      findings: [personFinding],
+    });
+    const fact = run.results.find((item) => item.provenance.specialist === "fact_check");
+    expect(fact?.provenance.status).toBe("timed_out");
+    expect(fact?.warnings).toContain(SPECIALIST_TIMEOUT_MESSAGE);
   });
 
   test("a retryable specialist provider failure is not retried and still degrades to 待人工核实", async () => {

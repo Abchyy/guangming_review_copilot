@@ -18,7 +18,7 @@ import { getReviewStore } from "@/lib/server/store-singleton";
 
 export { createProductSpecialistRuntime };
 
-export const maxDuration = 60;
+export const maxDuration = 480;
 
 function errorResponse(error: unknown): Response {
   if (error instanceof ReviewRequestError) {

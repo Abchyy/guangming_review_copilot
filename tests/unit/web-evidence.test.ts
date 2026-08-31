@@ -358,4 +358,51 @@ describe("web evidence fake provider and collector", () => {
     expect(run.results).toEqual([]);
     expect(recorder.queries).toEqual([]);
   });
+
+  test("starts the two planned searches concurrently and preserves query order", async () => {
+    const started: string[] = [];
+    const releases: Array<() => void> = [];
+    const provider: SearchProvider = {
+      id: "parallel-test",
+      kind: "fake_offline",
+      search(query) {
+        started.push(query.query_text);
+        return new Promise((resolve) => {
+          releases.push(() =>
+            resolve(
+              parseWebEvidenceResult({
+                evidence: [],
+                status: "unverified",
+                error_class: "not_found",
+                message: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
+                provenance: {
+                  provider_id: "parallel-test",
+                  provider_kind: "fake_offline",
+                  live_network: false,
+                  retrieved_at: retrievedAt,
+                  query_text: query.query_text,
+                  fact_category: query.fact_category,
+                },
+              }),
+            ),
+          );
+        });
+      },
+    };
+    const collect = createWebEvidenceCollector(provider).collect({
+      article,
+      findings: [
+        findingOf("person", "市教育局局长王海涛"),
+        findingOf("policy", "教育强国建设规划纲要"),
+      ],
+    });
+
+    await Promise.resolve();
+    expect(started).toEqual(["市教育局局长王海涛", "教育强国建设规划纲要"]);
+    expect(releases).toHaveLength(2);
+    releases.forEach((release) => release());
+    const run = await collect;
+    expect(run.query_count).toBe(2);
+    expect(run.results.map((item) => item.provenance.query_text)).toEqual(started);
+  });
 });

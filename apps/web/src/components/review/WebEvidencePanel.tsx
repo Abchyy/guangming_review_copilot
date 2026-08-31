@@ -15,6 +15,10 @@ type WebEvidencePanelProps = {
   run: WebEvidenceRun;
 };
 
+export type WebEvidenceCoverage = "retrieved" | "partial" | "unverified";
+
+export const WEB_EVIDENCE_PARTIAL_MESSAGE = "部分事实未能外部核验";
+
 const STATUS_LABEL: Record<WebEvidenceStatus, string> = {
   retrieved: "已返回网页证据",
   unverified: WEB_EVIDENCE_UNVERIFIED_MESSAGE,
@@ -40,26 +44,45 @@ export function hasUnverifiedWebEvidence(run: WebEvidenceRun | undefined): boole
   return Boolean(run?.results.some((item) => item.status === "unverified"));
 }
 
+export function getWebEvidenceCoverage(
+  run: WebEvidenceRun | undefined,
+): WebEvidenceCoverage {
+  const results = run?.results ?? [];
+  const hasRetrieved = results.some((item) => item.status === "retrieved");
+  const hasUnverified = results.some((item) => item.status === "unverified");
+  if (hasRetrieved && hasUnverified) {
+    return "partial";
+  }
+  return hasUnverified ? "unverified" : "retrieved";
+}
+
 export function WebEvidencePanel({ run }: WebEvidencePanelProps) {
   if (!run.enabled || run.results.length === 0) {
     return null;
   }
 
-  const unverified = hasUnverifiedWebEvidence(run);
+  const coverage = getWebEvidenceCoverage(run);
+  const needsCaution = coverage !== "retrieved";
+  const summaryLabel =
+    coverage === "partial"
+      ? "部分已返回"
+      : coverage === "unverified"
+        ? WEB_EVIDENCE_UNVERIFIED_MESSAGE
+        : "已返回网页证据";
 
   return (
     <section
-      className={`web-evidence-panel${unverified ? " is-unverified" : ""}`}
+      className={`web-evidence-panel${needsCaution ? ` is-${coverage}` : ""}`}
       data-testid="web-evidence-panel"
       aria-label="网页证据"
     >
       <header className="web-evidence-head">
         <h3 className="web-evidence-title">网页证据</h3>
         <span
-          className={`web-evidence-status-pill status-${unverified ? "unverified" : "retrieved"}`}
+          className={`web-evidence-status-pill status-${coverage}`}
           data-testid="web-evidence-status"
         >
-          {unverified ? WEB_EVIDENCE_UNVERIFIED_MESSAGE : "已返回网页证据"}
+          {summaryLabel}
         </span>
       </header>
       {run.results.map((result, index) => (

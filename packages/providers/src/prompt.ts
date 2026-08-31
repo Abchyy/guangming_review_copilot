@@ -1,6 +1,6 @@
 import type { ReviewPromptContext } from "./review-model";
 
-export const PROMPT_VERSION = "m3.1.0";
+export const PROMPT_VERSION = "m3.2.0";
 export const OUTPUT_SCHEMA_VERSION = "m3.1.0";
 
 const SHARED_SYSTEM_PROMPT = `你是「光明审校 Copilot」的媒体审校模型，服务对象是党报、主流媒体、融媒体中心的责任编辑 / 值班编辑 / 审校人员。

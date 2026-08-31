@@ -168,7 +168,7 @@ describe("POST /api/reviews", () => {
     expect(malformedPayload.pipeline.fallback?.mode).toBe("rules_only");
   });
 
-  test("provider failure with no rule hits still returns 502", async () => {
+  test("provider failure with no rule hits returns a cautionary empty fallback", async () => {
     const store = new ReviewStore(openReviewDatabase(":memory:"));
     const handler = createReviewPostHandler(new FailingModel(), store);
     const response = await handler(
@@ -177,7 +177,10 @@ describe("POST /api/reviews", () => {
         body: "今天没有机构、政策名称或可触发规则的错误。",
       }),
     );
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(200);
+    const payload = createReviewResponseSchema.parse(await response.json());
+    expect(payload.pipeline.fallback).toMatchObject({ used: true, mode: "rules_only" });
+    expect(payload.findings).toEqual([]);
   });
 });
 

@@ -187,6 +187,8 @@ export function fallbackProvenance(input: {
   adapterProvider: ReviewProvider;
   requestedModel: string | null;
   applicationCache: ApplicationCacheState;
+  failureError?: string;
+  failureLatencyMs?: number;
 }): ReviewExecutionProvenance {
   if (input.applicationCache.hit) {
     return applicationCacheProvenance({
@@ -202,15 +204,15 @@ export function fallbackProvenance(input: {
     attempts: [
       {
         attempt: 1,
-        outcome: "success",
+        outcome: input.failureError ? "retryable_failure" : "success",
         requested_model: input.requestedModel,
         observed_response_model: null,
         received_provider_response: false,
         usage: null,
-        error: null,
+        error: input.failureError ?? null,
       },
     ],
-    latencyMs: 0,
+    latencyMs: input.failureLatencyMs ?? 0,
     applicationCache: input.applicationCache,
   });
 }

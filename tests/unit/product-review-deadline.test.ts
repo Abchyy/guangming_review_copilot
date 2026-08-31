@@ -4,16 +4,25 @@ import { ReviewProviderError, WEB_EVIDENCE_UNVERIFIED_MESSAGE } from "@grc/contr
 import type { ReviewCandidate } from "@grc/contracts";
 import { FixtureReviewModel, type ReviewModel } from "@grc/providers";
 import {
+  PRODUCT_MAIN_REVIEW_BUDGET_MS,
+  PRODUCT_MAIN_REVIEW_ATTEMPT_TIMEOUT_MS,
   PRODUCT_REVIEW_DEADLINE_MS,
+  PRODUCT_REVIEW_MAX_ATTEMPTS,
+  PRODUCT_REVIEW_MAX_CANDIDATES,
   PRODUCT_REVIEW_MAX_ELAPSED_MS,
   PRODUCT_REVIEW_MAX_TOKENS,
+  PRODUCT_REVIEW_SDK_MAX_RETRIES,
   PRODUCT_REVIEW_SETTLE_MS,
+  PRODUCT_SPECIALIST_BUDGET_MS,
+  PRODUCT_WEB_EVIDENCE_BUDGET_MS,
   createReview,
   productAbortAtMs,
+  productPhaseBudgetMs,
 } from "@grc/review-core";
 import type { ReviewPromptContext } from "@grc/providers";
 import { createModelSpecialists, createSpecialistRuntime } from "@grc/agent-orchestration";
 import {
+  FakeSearchProvider,
   SearchProviderTimeoutError,
   TavilySearchProvider,
   createWebEvidenceCollector,
@@ -64,19 +73,39 @@ class IgnoreAbortReviewModel implements ReviewModel {
   }
 }
 
+class FailingReviewModel implements ReviewModel {
+  readonly provider = "deepseek" as const;
+  readonly model = "deepseek-v4-flash";
+
+  review(): Promise<ReviewCandidate[]> {
+    return Promise.reject(new ReviewProviderError("DeepSeek provider unavailable"));
+  }
+}
+
 describe("product review deadline", () => {
   test("product budget stays under the route cap", () => {
-    expect(PRODUCT_REVIEW_DEADLINE_MS).toBe(55_000);
+    expect(PRODUCT_REVIEW_DEADLINE_MS).toBe(470_000);
     expect(PRODUCT_REVIEW_DEADLINE_MS).toBeLessThan(PRODUCT_REVIEW_MAX_ELAPSED_MS);
-    expect(PRODUCT_REVIEW_MAX_ELAPSED_MS).toBe(60_000);
+    expect(PRODUCT_REVIEW_MAX_ELAPSED_MS).toBe(480_000);
     expect(PRODUCT_REVIEW_SETTLE_MS).toBeGreaterThan(0);
     expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeLessThan(PRODUCT_REVIEW_DEADLINE_MS);
-    expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeGreaterThan(50_000);
-    expect(PRODUCT_REVIEW_MAX_TOKENS).toBe(3072);
-    expect(PRODUCT_REVIEW_MAX_TOKENS).toBeLessThan(8192);
+    expect(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS)).toBeGreaterThan(460_000);
+    expect(PRODUCT_REVIEW_MAX_TOKENS).toBe(12_288);
+    expect(PRODUCT_REVIEW_MAX_CANDIDATES).toBe(20);
+    expect(PRODUCT_REVIEW_MAX_ATTEMPTS).toBe(2);
+    expect(PRODUCT_REVIEW_SDK_MAX_RETRIES).toBe(0);
+    expect(PRODUCT_MAIN_REVIEW_ATTEMPT_TIMEOUT_MS).toBe(150_000);
+    expect(
+      PRODUCT_MAIN_REVIEW_BUDGET_MS +
+        PRODUCT_WEB_EVIDENCE_BUDGET_MS +
+        PRODUCT_SPECIALIST_BUDGET_MS,
+    ).toBeLessThan(productAbortAtMs(PRODUCT_REVIEW_DEADLINE_MS));
+    expect(productPhaseBudgetMs(PRODUCT_MAIN_REVIEW_BUDGET_MS, 5_000)).toBeLessThan(
+      PRODUCT_MAIN_REVIEW_BUDGET_MS,
+    );
   });
 
-  test("product deadline path asks the main reviewer for compact JSON under 3072 tokens", async () => {
+  test("product deadline path asks the main reviewer for expanded recoverable JSON", async () => {
     const seen: ReviewPromptContext[] = [];
     const model: ReviewModel = {
       provider: "deepseek",
@@ -89,7 +118,12 @@ describe("product review deadline", () => {
     await createReview(article, model, { deadlineMs: 5_000 });
     expect(seen).toHaveLength(1);
     expect(seen[0]?.maxTokens).toBe(PRODUCT_REVIEW_MAX_TOKENS);
+    expect(seen[0]?.maxAttempts).toBe(PRODUCT_REVIEW_MAX_ATTEMPTS);
+    expect(seen[0]?.maxRetries).toBe(PRODUCT_REVIEW_SDK_MAX_RETRIES);
+    expect(seen[0]?.fallbackToTextJson).toBe(true);
     expect(seen[0]?.timeoutMs).toBeGreaterThan(0);
+    expect(seen[0]?.timeoutMs).toBeLessThanOrEqual(PRODUCT_MAIN_REVIEW_ATTEMPT_TIMEOUT_MS);
+    expect(seen[0]?.timeoutMs).toBeLessThanOrEqual(productPhaseBudgetMs(PRODUCT_MAIN_REVIEW_BUDGET_MS, 5_000));
   });
 
   test("official-style createReview without a deadline does not force a compact token cap", async () => {
@@ -104,6 +138,9 @@ describe("product review deadline", () => {
     };
     await createReview(article, model);
     expect(seen[0]?.maxTokens).toBeUndefined();
+    expect(seen[0]?.maxAttempts).toBeUndefined();
+    expect(seen[0]?.maxRetries).toBeUndefined();
+    expect(seen[0]?.fallbackToTextJson).toBeUndefined();
   });
 
   test("signal-only still forwards signal and timeout without a token cap", async () => {
@@ -123,6 +160,9 @@ describe("product review deadline", () => {
     expect("timeoutMs" in (seen[0] ?? {})).toBe(true);
     expect(seen[0]?.timeoutMs).toBeUndefined();
     expect(seen[0]?.maxTokens).toBeUndefined();
+    expect(seen[0]?.maxAttempts).toBeUndefined();
+    expect(seen[0]?.maxRetries).toBeUndefined();
+    expect(seen[0]?.fallbackToTextJson).toBeUndefined();
   });
 
   test("a hanging provider is aborted and degrades to rules_only under 60s", async () => {
@@ -135,7 +175,48 @@ describe("product review deadline", () => {
     expect(result.pipeline.elapsed_ms).toBeLessThan(PRODUCT_REVIEW_MAX_ELAPSED_MS);
     expect(result.pipeline.fallback?.used).toBe(true);
     expect(result.pipeline.fallback?.mode).toBe("rules_only");
+    const provenance = result.pipeline.provenance;
+    expect(provenance).toBeDefined();
+    expect(provenance?.attempts[0]).toMatchObject({
+      outcome: "retryable_failure",
+      received_provider_response: false,
+    });
+    expect(provenance?.attempts[0]?.error).toBeTruthy();
+    expect(provenance?.latency_ms).toBeGreaterThan(0);
     expect(result.findings.length).toBeGreaterThan(0);
+  });
+
+  test("main-review failure still dispatches Tavily work and both specialists", async () => {
+    const fallbackArticle = {
+      title: "科技创新与爱国主义教育工作推进会召开",
+      body: "2026年8月30日，材料称，“国家数据统计局”发布《2023年全国科技经费投入统计公报》。会议要求执行《中华人民共和国爱国主义教育法》。主持人宣读：“统计数据必须真实准确。”",
+    };
+    const collector = createWebEvidenceCollector(new FakeSearchProvider());
+    let specialistCalls = 0;
+    const specialists = createModelSpecialists(() => ({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      completeJson() {
+        specialistCalls += 1;
+        return Promise.resolve([]);
+      },
+    }));
+    const result = await createReview(fallbackArticle, new FailingReviewModel(), {
+      deadlineMs: 5_000,
+      webEvidenceCollector: collector,
+      specialistRuntime: createSpecialistRuntime(specialists),
+    });
+
+    expect(result.pipeline.fallback).toMatchObject({ used: true, mode: "rules_only" });
+    expect(result.pipeline.web_evidence?.query_count).toBe(2);
+    expect(result.pipeline.specialist_orchestration?.dispatched).toEqual([
+      "fact_check",
+      "news_edit",
+    ]);
+    expect(result.pipeline.specialist_orchestration?.budget.used).toBe(2);
+    expect(specialistCalls).toBe(2);
+    expect(result.findings.some((item) => item.type === "citation")).toBe(true);
+    expect(result.findings.every((item) => item.status === "verify")).toBe(true);
   });
 
   test("deadline aborts remaining web evidence fetches and returns 未能外部核验", async () => {
@@ -169,7 +250,7 @@ describe("product review deadline", () => {
     );
     const started = Date.now();
     const result = await createReview(article, new FixtureReviewModel(), {
-      deadlineMs: 40,
+      deadlineMs: 400,
       webEvidenceCollector: collector,
     });
     expect(aborted).toBe(true);
@@ -269,7 +350,7 @@ describe("product review deadline", () => {
     ).toBe(true);
   });
 
-  test("an ignore-abort hanging promise still returns within the deadline", async () => {
+  test("a main-review timeout preserves downstream web and specialist budgets", async () => {
     const model = new IgnoreAbortReviewModel();
     let searches = 0;
     const collector = createWebEvidenceCollector(
@@ -301,14 +382,14 @@ describe("product review deadline", () => {
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(result.pipeline.elapsed_ms).toBeLessThanOrEqual(deadlineMs);
     expect(model.calls).toBe(1);
-    expect(searches).toBe(0);
-    expect(specialistCalls).toBe(0);
+    expect(searches).toBeGreaterThan(0);
+    expect(specialistCalls).toBeGreaterThan(0);
     expect(result.pipeline.fallback?.mode).toBe("rules_only");
-    expect(result.pipeline.web_evidence?.query_count).toBe(0);
-    expect(result.pipeline.specialist_orchestration?.budget.used).toBe(0);
+    expect(result.pipeline.web_evidence?.query_count).toBeGreaterThan(0);
+    expect(result.pipeline.specialist_orchestration?.budget.used).toBeGreaterThan(0);
     expect(
       result.pipeline.specialist_orchestration?.results.every(
-        (item) => item.provenance.invoked === false && item.provenance.attempt_count === 0,
+        (item) => item.provenance.invoked === true && item.provenance.status === "timed_out",
       ),
     ).toBe(true);
   });

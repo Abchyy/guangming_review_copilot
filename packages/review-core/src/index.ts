@@ -1,5 +1,6 @@
 export * from "./article-hash";
 export * from "./evidence";
+export * from "./fallback-risk";
 export * from "./finding-rank";
 export * from "./fusion";
 export * from "./normalization";
