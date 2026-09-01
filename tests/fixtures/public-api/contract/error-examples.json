@@ -1,0 +1,141 @@
+{
+  "note": "One frozen error envelope per API v0 code from public-api.ts. Stack traces, SQL, upstream payloads and credentials are forbidden.",
+  "examples": [
+    {
+      "http": 400,
+      "code": "INVALID_REQUEST",
+      "body": {
+        "request_id": "req_error_invalid",
+        "error": { "code": "INVALID_REQUEST", "message": "请求不合法。" }
+      }
+    },
+    {
+      "http": 401,
+      "code": "AUTH_REQUIRED",
+      "body": {
+        "request_id": "req_error_auth",
+        "error": { "code": "AUTH_REQUIRED", "message": "需要登录后才能使用审校。" }
+      }
+    },
+    {
+      "http": 403,
+      "code": "FORBIDDEN",
+      "body": {
+        "request_id": "req_error_forbidden",
+        "error": { "code": "FORBIDDEN", "message": "当前操作不被允许。" }
+      }
+    },
+    {
+      "http": 404,
+      "code": "REVIEW_NOT_FOUND",
+      "body": {
+        "request_id": "req_error_not_found",
+        "error": { "code": "REVIEW_NOT_FOUND", "message": "审校不存在或已删除。" }
+      }
+    },
+    {
+      "http": 404,
+      "code": "FINDING_NOT_FOUND",
+      "body": {
+        "request_id": "req_error_finding_not_found",
+        "error": { "code": "FINDING_NOT_FOUND", "message": "找不到该审校意见。" }
+      }
+    },
+    {
+      "http": 409,
+      "code": "VERSION_CONFLICT",
+      "body": {
+        "request_id": "req_error_version",
+        "error": { "code": "VERSION_CONFLICT", "message": "稿件版本已变化，请刷新后重试。" }
+      }
+    },
+    {
+      "http": 409,
+      "code": "REVIEW_ALREADY_RUNNING",
+      "body": {
+        "request_id": "req_error_running",
+        "error": { "code": "REVIEW_ALREADY_RUNNING", "message": "已有进行中的审校任务。" }
+      }
+    },
+    {
+      "http": 409,
+      "code": "IDEMPOTENCY_CONFLICT",
+      "body": {
+        "request_id": "req_error_idempotency",
+        "error": { "code": "IDEMPOTENCY_CONFLICT", "message": "同一幂等键不能用于不同请求体。" }
+      }
+    },
+    {
+      "http": 400,
+      "code": "PRIVACY_NOTICE_OUTDATED",
+      "body": {
+        "request_id": "req_error_privacy",
+        "error": { "code": "PRIVACY_NOTICE_OUTDATED", "message": "隐私声明版本已过期。" }
+      }
+    },
+    {
+      "http": 413,
+      "code": "ARTICLE_TOO_LARGE",
+      "body": {
+        "request_id": "req_error_too_large",
+        "error": { "code": "ARTICLE_TOO_LARGE", "message": "稿件超过长度上限。" }
+      }
+    },
+    {
+      "http": 422,
+      "code": "CONTENT_REJECTED",
+      "body": {
+        "request_id": "req_error_rejected",
+        "error": { "code": "CONTENT_REJECTED", "message": "稿件未通过内容安全检查。" }
+      }
+    },
+    {
+      "http": 429,
+      "code": "DAILY_QUOTA_EXCEEDED",
+      "body": {
+        "request_id": "req_error_quota",
+        "error": { "code": "DAILY_QUOTA_EXCEEDED", "message": "今日审校次数已用完。" }
+      }
+    },
+    {
+      "http": 429,
+      "code": "RATE_LIMITED",
+      "body": {
+        "request_id": "req_error_rate",
+        "error": { "code": "RATE_LIMITED", "message": "请求过于频繁，请稍后重试。" }
+      }
+    },
+    {
+      "http": 503,
+      "code": "REVIEW_CAPACITY_EXHAUSTED",
+      "body": {
+        "request_id": "req_error_capacity",
+        "error": { "code": "REVIEW_CAPACITY_EXHAUSTED", "message": "审校服务繁忙，请稍后重试。" }
+      }
+    },
+    {
+      "http": 503,
+      "code": "UPSTREAM_UNAVAILABLE",
+      "body": {
+        "request_id": "req_error_upstream",
+        "error": { "code": "UPSTREAM_UNAVAILABLE", "message": "审校暂时不可用，请稍后重试。" }
+      }
+    },
+    {
+      "http": 503,
+      "code": "NOT_IMPLEMENTED",
+      "body": {
+        "request_id": "req_error_not_implemented",
+        "error": { "code": "NOT_IMPLEMENTED", "message": "该能力尚未对公众环境开放。" }
+      }
+    },
+    {
+      "http": 500,
+      "code": "INTERNAL_ERROR",
+      "body": {
+        "request_id": "req_error_internal",
+        "error": { "code": "INTERNAL_ERROR", "message": "服务内部错误。" }
+      }
+    }
+  ]
+}

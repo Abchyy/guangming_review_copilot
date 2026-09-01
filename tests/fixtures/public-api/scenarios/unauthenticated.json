@@ -1,0 +1,97 @@
+{
+  "id": "unauthenticated",
+  "title": "未认证请求返回 AUTH_REQUIRED",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "steps": [
+    {
+      "name": "create_without_token",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "idempotency-key": "44444444-4444-4444-8444-444444444444"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_unauth_create",
+          "error": {
+            "code": "AUTH_REQUIRED",
+            "message": "需要登录后才能使用审校。"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_without_token",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/reviews/rev_fixture_success",
+        "headers": {},
+        "body": null
+      },
+      "response": {
+        "status": 401,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_unauth_get",
+          "error": {
+            "code": "AUTH_REQUIRED",
+            "message": "需要登录后才能使用审校。"
+          }
+        }
+      }
+    },
+    {
+      "name": "delete_without_token",
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/reviews/rev_fixture_success",
+        "headers": {},
+        "body": null
+      },
+      "response": {
+        "status": 401,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_unauth_delete",
+          "error": {
+            "code": "AUTH_REQUIRED",
+            "message": "需要登录后才能使用审校。"
+          }
+        }
+      }
+    },
+    {
+      "name": "invalid_token",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/reviews/rev_fixture_success",
+        "headers": {
+          "authorization": "Bearer sess_fixture_invalid_000000000001"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 401,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_unauth_invalid",
+          "error": {
+            "code": "AUTH_REQUIRED",
+            "message": "会话无效或已过期，请重新登录。"
+          }
+        }
+      }
+    }
+  ]
+}

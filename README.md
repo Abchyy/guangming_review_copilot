@@ -31,6 +31,10 @@ npm run typecheck
 npm run lint
 npm test
 npm run build
+npm --prefix apps/miniprogram run typecheck
+npm --prefix apps/miniprogram test
+npx vitest run tests/public-release
+node scripts/public-release/scan-sensitive.mjs
 ```
 
 ## 测试入口
@@ -64,7 +68,7 @@ npm run holdout:status
 
 ## 仓库结构
 
-当前是 **npm workspaces 单体仓库**，唯一可部署应用是 `apps/web`（Next.js 16.3.1 App Router）。业务能力在 `packages/*`，通过公共入口导入，例如：
+当前是 **npm workspaces 单体仓库**。可部署的 Next.js 应用仍是 `apps/web`（16.3.1 App Router，同时承载 Web Demo 与 Public API v0 fixture）。`apps/miniprogram` 是公众版微信小程序的本地 fixture 客户端，工作名为「AI 审校助手」，默认不连接真实微信或生产域名。业务能力在 `packages/*`，通过公共入口导入，例如：
 
 ```ts
 import type { Finding } from "@grc/contracts";
@@ -87,6 +91,9 @@ import { createReview } from "@grc/review-core";
 | `@grc/holdout-protocol` | official freeze / fail-closed 协议 | 产品运行时不得依赖 |
 | `@grc/test-kit` | 离线测试辅助 | 仅 devDependency |
 | `@grc/web` | UI 与 Route Handler 组合 | benchmark / holdout / test-kit |
+| `@review/miniprogram` | 公众版小程序 fixture 客户端 | 后端包、真实 AppID、生产域名 |
+
+Public API v0 的唯一契约事实源是 `packages/contracts/src/public-api.ts`。小程序只保留本地 projection，发布 Gate 只保留离线 fixture。`PUBLIC_API_MODE=production` 时 API 失败关闭，不会调用真实微信。
 
 `data/` 与 `docs/` 留在仓库根目录。
 
@@ -103,6 +110,8 @@ npm run test:web
 npm run test:orchestration
 npm run test:benchmark
 npm run test:protocol
+npm run test:miniprogram
+npm run test:public-release
 ```
 
 根目录 `npm test` 仍覆盖全部离线测试。普通测试必须离线，即使环境里有 API Key。

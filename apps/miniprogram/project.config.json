@@ -1,0 +1,16 @@
+{
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "projectname": "ai-review-assistant",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "postcss": true
+  },
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "tests" },
+      { "type": "folder", "value": "typings" }
+    ]
+  }
+}

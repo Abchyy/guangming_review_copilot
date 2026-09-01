@@ -1,0 +1,135 @@
+<view class="page">
+  <view class="masthead">
+    <view class="eyebrow">Public fixture</view>
+    <view class="title">{{productName}}</view>
+    <view class="disclaimer">{{aiDisclaimer}}</view>
+  </view>
+
+  <view wx:if="{{showFixtureBanner}}" class="banner banner-info">{{fixtureBanner}}</view>
+
+  <view wx:if="{{errorVisible}}" class="banner banner-error" data-kind="{{errorKind}}">
+    <view class="banner-kicker">{{errorCode}}</view>
+    <view>{{errorMessage}}</view>
+  </view>
+
+  <view wx:if="{{phase === 'input'}}" class="card">
+    <view class="card-kicker">输入稿件</view>
+    <view class="field-label">
+      <text>标题</text>
+      <text class="count {{titleOver ? 'is-over' : ''}}">{{titleCount}}</text>
+    </view>
+    <input
+      class="input"
+      value="{{title}}"
+      maxlength="240"
+      placeholder="请输入稿件标题"
+      bindinput="onTitleInput"
+    />
+    <view class="field-label">
+      <text>正文</text>
+      <text class="count {{bodyOver ? 'is-over' : ''}}">{{bodyCount}}</text>
+    </view>
+    <textarea
+      class="textarea"
+      value="{{body}}"
+      maxlength="12000"
+      placeholder="请粘贴需要审校的正文"
+      auto-height
+      bindinput="onBodyInput"
+    />
+    <view class="quota">{{quotaText}}</view>
+    <view class="privacy" bindtap="onTogglePrivacy">
+      <view class="checkbox {{privacyChecked ? 'is-on' : ''}}"></view>
+      <text>{{privacyText}}</text>
+    </view>
+    <view class="actions">
+      <button wx:if="{{showSampleButton}}" class="ghost" bindtap="onFillSample">填入示例稿件</button>
+      <button class="primary" disabled="{{!canSubmit}}" bindtap="onSubmit">
+        {{submitting ? '提交中…' : '开始审校'}}
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{phase === 'progress'}}" class="card status-card">
+    <view class="status-dot"></view>
+    <view class="card-kicker">任务进度</view>
+    <view class="status-title">{{progressTitle}}</view>
+    <view class="status-detail">{{progressDetail}}</view>
+    <button wx:if="{{hasReview}}" class="ghost danger" bindtap="onDelete">取消并删除任务</button>
+  </view>
+
+  <view wx:if="{{phase === 'failure'}}" class="card status-card">
+    <view class="card-kicker">无法给出通过结论</view>
+    <view class="status-title">{{errorVisible ? errorMessage : cautionText}}</view>
+    <view class="status-detail">空结果、超时或上游异常都不能视为稿件没有问题。</view>
+    <view class="actions">
+      <button class="ghost" bindtap="onReset">返回修改</button>
+      <button class="ghost danger" bindtap="onDelete">删除任务</button>
+    </view>
+  </view>
+
+  <view wx:if="{{phase === 'result'}}" class="result">
+    <view wx:if="{{cautionVisible}}" class="banner banner-caution">{{cautionText}}</view>
+    <view wx:if="{{emptyResultVisible}}" class="banner banner-info">
+      <view class="banner-kicker">{{emptyResultTitle}}</view>
+      <view>{{emptyResultDetail}}</view>
+    </view>
+
+    <view class="paper">
+      <view class="paper-kicker">正文</view>
+      <view class="paper-title">{{articleTitle}}</view>
+      <view class="paper-body">
+        <block wx:for="{{segments}}" wx:key="key">
+          <text
+            wx:if="{{item.highlight}}"
+            class="mark"
+            data-id="{{item.findingId}}"
+            bindtap="onSelectFinding"
+          >{{item.text}}</text>
+          <text wx:else>{{item.text}}</text>
+        </block>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="card-kicker">审校意见</view>
+      <view wx:if="{{findings.length === 0 && !emptyResultVisible && cautionVisible}}" class="muted">
+        本轮没有完整模型结论，请人工复核全文。
+      </view>
+      <view
+        wx:for="{{findings}}"
+        wx:key="finding_id"
+        class="finding {{item.pending ? 'is-pending' : ''}}"
+        data-id="{{item.finding_id}}"
+        bindtap="onSelectFinding"
+      >
+        <view class="finding-meta">
+          <text class="sev sev-{{item.severity}}">{{item.severityLabel}}</text>
+          <text class="finding-status">{{item.statusLabel}}</text>
+        </view>
+        <view class="finding-title">{{item.title}}</view>
+        <view class="finding-reason">{{item.reason}}</view>
+      </view>
+      <button class="ghost danger" bindtap="onDelete">删除本篇审校</button>
+    </view>
+  </view>
+
+  <view wx:if="{{sheetVisible}}" class="sheet-mask" bindtap="onCloseSheet"></view>
+  <view wx:if="{{sheetVisible}}" class="sheet">
+    <view class="sheet-handle"></view>
+    <view class="finding-meta">
+      <text class="sev sev-{{selectedFinding.severity}}">{{selectedFinding.severityLabel}}</text>
+      <text class="finding-status">{{selectedFinding.statusLabel}}</text>
+    </view>
+    <view class="finding-title">{{selectedFinding.title}}</view>
+    <view class="quote">{{selectedFinding.quoted}}</view>
+    <view class="finding-reason">{{selectedFinding.reason}}</view>
+    <view class="suggestion">建议：{{selectedFinding.suggestion}}</view>
+    <view wx:if="{{selectedFinding.replacement}}" class="replacement">改为：{{selectedFinding.replacement}}</view>
+    <view class="sheet-actions">
+      <button class="primary" disabled="{{!selectedFinding.canAccept || submitting}}" bindtap="onAccept">接受</button>
+      <button class="ghost" disabled="{{submitting}}" bindtap="onIgnore">忽略</button>
+      <button class="ghost" disabled="{{submitting}}" bindtap="onVerify">待核实</button>
+    </view>
+  </view>
+</view>

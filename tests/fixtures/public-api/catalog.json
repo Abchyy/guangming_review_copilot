@@ -1,0 +1,29 @@
+{
+  "api_version": "v0",
+  "product_working_name": "AI 审校助手",
+  "evidence_class_vocabulary": [
+    "FIXTURE_VERIFIED",
+    "STATIC_CHECK",
+    "NOT_VERIFIED",
+    "BLOCKED_EXTERNAL"
+  ],
+  "privacy_notice_version": "public-v1",
+  "disclaimer": "These fixtures are offline recorded HTTP exchanges for API v0. Passing them proves contract shape and replay, not integration, not deployment, not a live WeChat login, and not that anyone can scan a QR code to use the product.",
+  "live_calls_forbidden": true,
+  "scenarios": [
+    { "id": "success", "file": "scenarios/success.json", "required": true },
+    { "id": "degraded", "file": "scenarios/degraded.json", "required": true },
+    { "id": "failed", "file": "scenarios/failed.json", "required": true },
+    { "id": "unauthenticated", "file": "scenarios/unauthenticated.json", "required": true },
+    { "id": "forbidden", "file": "scenarios/forbidden.json", "required": true },
+    { "id": "idempotent-retry", "file": "scenarios/idempotent-retry.json", "required": true },
+    { "id": "idempotent-conflict", "file": "scenarios/idempotent-conflict.json", "required": true },
+    { "id": "invalid-request", "file": "scenarios/invalid-request.json", "required": true },
+    { "id": "article-too-large", "file": "scenarios/article-too-large.json", "required": true },
+    { "id": "content-rejected", "file": "scenarios/content-rejected.json", "required": true },
+    { "id": "daily-quota-exceeded", "file": "scenarios/daily-quota-exceeded.json", "required": true },
+    { "id": "rate-limited", "file": "scenarios/rate-limited.json", "required": true },
+    { "id": "delete", "file": "scenarios/delete.json", "required": true },
+    { "id": "unavailable", "file": "scenarios/unavailable.json", "required": true }
+  ]
+}

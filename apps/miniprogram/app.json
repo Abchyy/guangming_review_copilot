@@ -1,0 +1,11 @@
+{
+  "pages": ["pages/review/index"],
+  "window": {
+    "navigationBarTitleText": "AI 审校助手",
+    "navigationBarBackgroundColor": "#0f3d2e",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f4f5f1",
+    "backgroundTextStyle": "dark"
+  },
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,4 @@
+{
+  "desc": "AI 审校助手开发期页面索引",
+  "rules": [{ "action": "disallow", "page": "*" }]
+}

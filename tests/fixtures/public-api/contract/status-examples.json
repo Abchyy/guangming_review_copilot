@@ -1,0 +1,131 @@
+{
+  "note": "One GET envelope per frozen review status. These are contract snapshots, not live jobs.",
+  "examples": {
+    "queued": {
+      "request_id": "req_status_queued",
+      "review": {
+        "review_id": "rev_status_queued",
+        "status": "queued",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": null,
+        "failure_code": null,
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    },
+    "running": {
+      "request_id": "req_status_running",
+      "review": {
+        "review_id": "rev_status_running",
+        "status": "running",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": null,
+        "failure_code": null,
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    },
+    "succeeded": {
+      "request_id": "req_status_succeeded",
+      "review": {
+        "review_id": "rev_status_succeeded",
+        "status": "succeeded",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": null,
+        "failure_code": null,
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    },
+    "degraded": {
+      "request_id": "req_status_degraded",
+      "review": {
+        "review_id": "rev_status_degraded",
+        "status": "degraded",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": "模型审校未完成，本轮仅完成规则检查，不能视为稿件没有问题。",
+        "failure_code": null,
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    },
+    "failed": {
+      "request_id": "req_status_failed",
+      "review": {
+        "review_id": "rev_status_failed",
+        "status": "failed",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": null,
+        "failure_code": "UPSTREAM_UNAVAILABLE",
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    },
+    "cancelled": {
+      "request_id": "req_status_cancelled",
+      "review": {
+        "review_id": "rev_status_cancelled",
+        "status": "cancelled",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": null,
+        "failure_code": null,
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    },
+    "expired": {
+      "request_id": "req_status_expired",
+      "review": {
+        "review_id": "rev_status_expired",
+        "status": "expired",
+        "article": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "version": 1
+        },
+        "findings": [],
+        "degradation_notice": null,
+        "failure_code": null,
+        "created_at": "2026-09-01T00:00:00.000Z",
+        "updated_at": "2026-09-01T00:00:00.000Z",
+        "expires_at": "2026-09-02T00:00:00.000Z"
+      }
+    }
+  }
+}

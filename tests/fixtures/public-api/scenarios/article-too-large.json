@@ -1,0 +1,65 @@
+{
+  "id": "article-too-large",
+  "title": "超长标题或正文",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "note": "Public V1 limits are 200/10000 UTF-16 code units. Current packages/contracts still export 500/50000; that mismatch is a change request, not silently rewritten here.",
+  "steps": [
+    {
+      "name": "title_too_large",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "99999999-9999-4999-8999-999999999991"
+        },
+        "body": {
+          "title": { "__repeat": { "value": "标", "count": 201 } },
+          "body": "示例讯。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 413,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_too_large_title",
+          "error": {
+            "code": "ARTICLE_TOO_LARGE",
+            "message": "标题超过 200 个 UTF-16 code unit。"
+          }
+        }
+      }
+    },
+    {
+      "name": "body_too_large",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "99999999-9999-4999-8999-999999999992"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": { "__repeat": { "value": "正", "count": 10001 } },
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 413,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_too_large_body",
+          "error": {
+            "code": "ARTICLE_TOO_LARGE",
+            "message": "正文超过 10000 个 UTF-16 code unit。"
+          }
+        }
+      }
+    }
+  ]
+}

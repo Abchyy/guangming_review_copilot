@@ -14,6 +14,19 @@ import {
   parseWebEvidenceResult,
   webEvidenceQuerySchema,
   webEvidenceResultSchema,
+  PUBLIC_API_ERROR_CODES,
+  PUBLIC_API_ERROR_HTTP_STATUS,
+  PUBLIC_BODY_MAX_LENGTH,
+  PUBLIC_DEFAULT_DAILY_LIMIT,
+  PUBLIC_DEFAULT_RUNNING_LIMIT,
+  PUBLIC_PRIVACY_NOTICE_VERSION,
+  PUBLIC_REVIEW_DEGRADATION_NOTICE,
+  PUBLIC_TITLE_MAX_LENGTH,
+  isPublicArticleTooLarge,
+  publicApiErrorResponseSchema,
+  publicCreateReviewRequestSchema,
+  publicReviewResourceSchema,
+  wechatAuthRequestSchema,
 } from "@grc/contracts";
 
 const validCandidate = {
@@ -400,6 +413,111 @@ describe("web evidence contracts", () => {
           query_text: "市教育局局长王海涛",
           fact_category: "person_title",
         },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("public API v0 contracts", () => {
+  const timestamps = {
+    created_at: "2026-09-01T00:00:00.000Z",
+    updated_at: "2026-09-01T00:00:00.000Z",
+    expires_at: "2026-09-02T00:00:00.000Z",
+  };
+
+  test("freezes public limits, quota defaults, and error HTTP status", () => {
+    expect(PUBLIC_TITLE_MAX_LENGTH).toBe(200);
+    expect(PUBLIC_BODY_MAX_LENGTH).toBe(10_000);
+    expect(PUBLIC_DEFAULT_DAILY_LIMIT).toBe(3);
+    expect(PUBLIC_DEFAULT_RUNNING_LIMIT).toBe(1);
+    expect(PUBLIC_PRIVACY_NOTICE_VERSION).toBe("public-v1");
+    expect(PUBLIC_REVIEW_DEGRADATION_NOTICE).toBe(
+      "模型审校未完成，本轮仅完成规则检查，不能视为稿件没有问题。",
+    );
+    expect(PUBLIC_API_ERROR_HTTP_STATUS.AUTH_REQUIRED).toBe(401);
+    expect(PUBLIC_API_ERROR_HTTP_STATUS.ARTICLE_TOO_LARGE).toBe(413);
+    expect(PUBLIC_API_ERROR_HTTP_STATUS.DAILY_QUOTA_EXCEEDED).toBe(429);
+    expect(PUBLIC_API_ERROR_HTTP_STATUS.NOT_IMPLEMENTED).toBe(503);
+    expect(PUBLIC_API_ERROR_CODES).toEqual(expect.arrayContaining([
+      "INVALID_REQUEST",
+      "AUTH_REQUIRED",
+      "FORBIDDEN",
+      "REVIEW_NOT_FOUND",
+      "VERSION_CONFLICT",
+      "REVIEW_ALREADY_RUNNING",
+      "ARTICLE_TOO_LARGE",
+      "CONTENT_REJECTED",
+      "DAILY_QUOTA_EXCEEDED",
+      "RATE_LIMITED",
+      "REVIEW_CAPACITY_EXHAUSTED",
+      "UPSTREAM_UNAVAILABLE",
+      "NOT_IMPLEMENTED",
+    ]));
+  });
+
+  test("rejects extra create-review fields and measures UTF-16 article limits", () => {
+    expect(
+      publicCreateReviewRequestSchema.safeParse({
+        title: "标题",
+        body: "正文",
+        privacy_notice_version: PUBLIC_PRIVACY_NOTICE_VERSION,
+        user_id: "attacker",
+      }).success,
+    ).toBe(false);
+    expect(wechatAuthRequestSchema.safeParse({ code: "wxcode", openid: "x" }).success).toBe(false);
+    expect(isPublicArticleTooLarge("标".repeat(200), "正".repeat(10_000))).toBe(false);
+    expect(isPublicArticleTooLarge("标".repeat(201), "正文")).toBe(true);
+    expect(isPublicArticleTooLarge("标题", "正".repeat(10_001))).toBe(true);
+  });
+
+  test("degraded reviews must carry the frozen caution notice", () => {
+    const base = {
+      review_id: "review_1",
+      article: { title: "标题", body: "正文内容", version: 1 },
+      findings: [],
+      failure_code: null,
+      ...timestamps,
+    };
+    expect(
+      publicReviewResourceSchema.safeParse({
+        ...base,
+        status: "degraded",
+        degradation_notice: PUBLIC_REVIEW_DEGRADATION_NOTICE,
+      }).success,
+    ).toBe(true);
+    expect(
+      publicReviewResourceSchema.safeParse({
+        ...base,
+        status: "degraded",
+        degradation_notice: "没有问题",
+      }).success,
+    ).toBe(false);
+    expect(
+      publicReviewResourceSchema.safeParse({
+        ...base,
+        status: "succeeded",
+        degradation_notice: PUBLIC_REVIEW_DEGRADATION_NOTICE,
+      }).success,
+    ).toBe(false);
+    expect(
+      publicReviewResourceSchema.safeParse({
+        ...base,
+        status: "failed",
+        degradation_notice: null,
+        failure_code: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  test("error envelope requires request_id and a stable code", () => {
+    const parsed = publicApiErrorResponseSchema.parse({
+      request_id: "req_1",
+      error: { code: "AUTH_REQUIRED", message: "Authorization bearer token is required" },
+    });
+    expect(parsed.error.code).toBe("AUTH_REQUIRED");
+    expect(
+      publicApiErrorResponseSchema.safeParse({
+        error: { code: "AUTH_REQUIRED", message: "missing" },
       }).success,
     ).toBe(false);
   });

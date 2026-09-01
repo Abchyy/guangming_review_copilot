@@ -1,0 +1,109 @@
+{
+  "api_version": "v0",
+  "source": "public-backend/packages/contracts/src/public-api.ts",
+  "product_working_name": "AI 审校助手",
+  "base_path": "/api/v1",
+  "privacy_notice_version": "public-v1",
+  "auth_header": "Authorization: Bearer <opaque_session_token>",
+  "idempotency_header": "Idempotency-Key: <uuid>",
+  "limits": {
+    "title_max_utf16": 200,
+    "body_max_utf16": 10000,
+    "daily_limit_default": 3,
+    "running_limit_default": 1,
+    "poll_after_ms_default": 1000,
+    "session_token_min_length": 32
+  },
+  "review_statuses": [
+    "queued",
+    "running",
+    "succeeded",
+    "degraded",
+    "failed",
+    "cancelled",
+    "expired"
+  ],
+  "error_codes": [
+    { "http": 400, "code": "INVALID_REQUEST" },
+    { "http": 401, "code": "AUTH_REQUIRED" },
+    { "http": 403, "code": "FORBIDDEN" },
+    { "http": 404, "code": "REVIEW_NOT_FOUND" },
+    { "http": 404, "code": "FINDING_NOT_FOUND" },
+    { "http": 409, "code": "VERSION_CONFLICT" },
+    { "http": 409, "code": "REVIEW_ALREADY_RUNNING" },
+    { "http": 409, "code": "IDEMPOTENCY_CONFLICT" },
+    { "http": 400, "code": "PRIVACY_NOTICE_OUTDATED" },
+    { "http": 413, "code": "ARTICLE_TOO_LARGE" },
+    { "http": 422, "code": "CONTENT_REJECTED" },
+    { "http": 429, "code": "DAILY_QUOTA_EXCEEDED" },
+    { "http": 429, "code": "RATE_LIMITED" },
+    { "http": 503, "code": "REVIEW_CAPACITY_EXHAUSTED" },
+    { "http": 503, "code": "UPSTREAM_UNAVAILABLE" },
+    { "http": 503, "code": "NOT_IMPLEMENTED" },
+    { "http": 500, "code": "INTERNAL_ERROR" }
+  ],
+  "degraded_caution": "模型审校未完成，本轮仅完成规则检查，不能视为稿件没有问题。",
+  "ttl": {
+    "declared_retention_hours": 24,
+    "deployment_status": "NOT_VERIFIED",
+    "note": "This is a contract declaration for fixtures. TTL cleanup is not deployed."
+  },
+  "delete": {
+    "http": 204,
+    "owner_only": true,
+    "running_jobs_are_cancelled_first": true,
+    "subsequent_get_http": 404,
+    "subsequent_get_code": "REVIEW_NOT_FOUND",
+    "repeat_delete_http": 204,
+    "irreversible": true,
+    "deployment_status": "NOT_VERIFIED",
+    "note": "Fixture records delete semantics. Production delete is not deployed."
+  },
+  "ownership": {
+    "review_id_is_not_authorization": true,
+    "every_query_includes_owner_predicate": true,
+    "unauthenticated": { "http": 401, "code": "AUTH_REQUIRED" },
+    "authenticated_non_owner": { "http": 404, "code": "REVIEW_NOT_FOUND" }
+  },
+  "logging_policy": {
+    "allowed": [
+      "request_id",
+      "review_id",
+      "job_id",
+      "owner_key",
+      "status",
+      "elapsed_ms",
+      "error_code",
+      "provider",
+      "model",
+      "usage",
+      "cost",
+      "degraded"
+    ],
+    "forbidden": [
+      "article_body",
+      "article_title",
+      "openid",
+      "unionid",
+      "bearer_token",
+      "session_token",
+      "provider_key",
+      "upstream_raw"
+    ],
+    "deployment_status": "NOT_VERIFIED",
+    "note": "Log samples below are format fixtures only. They do not prove a production logger is configured."
+  },
+  "forbidden_response_fields": [
+    "stack",
+    "sql",
+    "openid",
+    "unionid",
+    "user_id",
+    "owner",
+    "app_secret",
+    "appsecret",
+    "api_key",
+    "provider_key",
+    "upstream"
+  ]
+}

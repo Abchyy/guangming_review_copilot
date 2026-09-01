@@ -1,0 +1,64 @@
+{
+  "id": "idempotent-conflict",
+  "title": "相同幂等键不同请求体冲突",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "steps": [
+    {
+      "name": "create_first",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "77777777-7777-4777-8777-777777777777"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_idem_conflict_1",
+          "review_id": "rev_fixture_idem_conflict",
+          "status": "queued",
+          "poll_after_ms": 1000,
+          "expires_at": "2026-09-02T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "create_conflict",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "77777777-7777-4777-8777-777777777777"
+        },
+        "body": {
+          "title": "另一篇示例稿件标题",
+          "body": "这是与同一幂等键冲突的另一段示例正文。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 409,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_idem_conflict_2",
+          "error": {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "message": "同一幂等键不能用于不同请求体。"
+          }
+        }
+      }
+    }
+  ]
+}

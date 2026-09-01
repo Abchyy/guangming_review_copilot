@@ -1,0 +1,70 @@
+{
+  "id": "idempotent-retry",
+  "title": "相同幂等键与相同请求体重试返回同一 review",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "assertions": {
+    "same_review_id": true,
+    "declared_quota_deductions": 1,
+    "declared_model_calls": 1
+  },
+  "note": "Second response must reuse review_id. Quota/model non-duplication is declared here and is NOT a deployed metering proof.",
+  "steps": [
+    {
+      "name": "create_first",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "66666666-6666-4666-8666-666666666666"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_idem_retry_1",
+          "review_id": "rev_fixture_idem_retry",
+          "status": "queued",
+          "poll_after_ms": 1000,
+          "expires_at": "2026-09-02T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "create_retry",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "66666666-6666-4666-8666-666666666666"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_idem_retry_2",
+          "review_id": "rev_fixture_idem_retry",
+          "status": "queued",
+          "poll_after_ms": 1000,
+          "expires_at": "2026-09-02T00:00:00.000Z"
+        }
+      }
+    }
+  ]
+}

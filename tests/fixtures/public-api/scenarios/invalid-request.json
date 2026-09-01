@@ -1,0 +1,120 @@
+{
+  "id": "invalid-request",
+  "title": "非法输入与禁止的客户端覆盖字段",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "steps": [
+    {
+      "name": "missing_privacy_notice",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "88888888-8888-4888-8888-888888888881"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。"
+        }
+      },
+      "response": {
+        "status": 400,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_invalid_privacy",
+          "error": {
+            "code": "INVALID_REQUEST",
+            "message": "缺少 privacy_notice_version。"
+          }
+        }
+      }
+    },
+    {
+      "name": "client_supplied_user_id",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "88888888-8888-4888-8888-888888888882"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1",
+          "user_id": "attacker"
+        }
+      },
+      "response": {
+        "status": 400,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_invalid_user_id",
+          "error": {
+            "code": "INVALID_REQUEST",
+            "message": "客户端不得传入 user_id、OpenID、owner、quota 或 provider key。"
+          }
+        }
+      }
+    },
+    {
+      "name": "malformed_title_type",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "88888888-8888-4888-8888-888888888883"
+        },
+        "body": {
+          "title": 1,
+          "body": "示例讯。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 400,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_invalid_title_type",
+          "error": {
+            "code": "INVALID_REQUEST",
+            "message": "title 必须是字符串。"
+          }
+        }
+      }
+    },
+    {
+      "name": "privacy_notice_outdated",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "88888888-8888-4888-8888-888888888884"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "old-notice"
+        }
+      },
+      "response": {
+        "status": 400,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_invalid_privacy_outdated",
+          "error": {
+            "code": "PRIVACY_NOTICE_OUTDATED",
+            "message": "隐私声明版本已过期。"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@review/miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node ../../node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --import ./tests/register.mjs --test tests/*.test.ts"
+  }
+}

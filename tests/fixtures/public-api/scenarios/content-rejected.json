@@ -1,0 +1,37 @@
+{
+  "id": "content-rejected",
+  "title": "内容安全拒绝",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "note": "Uses a synthetic fixture marker rather than real prohibited content.",
+  "steps": [
+    {
+      "name": "rejected",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "FIXTURE_CONTENT_REJECTED",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 422,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_content_rejected",
+          "error": {
+            "code": "CONTENT_REJECTED",
+            "message": "稿件未通过内容安全检查。"
+          }
+        }
+      }
+    }
+  ]
+}

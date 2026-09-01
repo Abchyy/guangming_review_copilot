@@ -1,0 +1,182 @@
+{
+  "id": "success",
+  "title": "成功创建、查询并决策",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "note": "Fixture replay of the API v0 happy path. Feature-lane fixture only; not integrated, deployed, or WeChat-verified.",
+  "steps": [
+    {
+      "name": "login",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/wechat",
+        "headers": { "content-type": "application/json" },
+        "body": { "code": "fixture_code_owner_a" }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_success_login",
+          "session_token": "sess_fixture_owner_a_0000000000001",
+          "expires_at": "2026-09-01T02:00:00.000Z",
+          "daily_limit": 3,
+          "remaining": 3,
+          "running_limit": 1
+        }
+      }
+    },
+    {
+      "name": "create",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "11111111-1111-4111-8111-111111111111"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_success_create",
+          "review_id": "rev_fixture_success",
+          "status": "queued",
+          "poll_after_ms": 1000,
+          "expires_at": "2026-09-02T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "get_succeeded",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/reviews/rev_fixture_success",
+        "headers": {
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 200,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_success_get",
+          "review": {
+            "review_id": "rev_fixture_success",
+            "status": "succeeded",
+            "article": {
+              "title": "示例单位召开示例工作会议",
+              "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+              "version": 1
+            },
+            "findings": [
+              {
+                "finding_id": "fnd_success_001",
+                "type": "basic_text",
+                "severity": "low",
+                "title": "示例用词需人工确认",
+                "reason": "fixture 成功路径的示例标注，不代表真实审校结论。",
+                "status": "pending",
+                "suggestion": { "text": "请人工确认该表述。", "replacement": null },
+                "confidence": 0.5,
+                "evidence": [
+                  {
+                    "kind": "rule",
+                    "excerpt": "示例讯",
+                    "citation_validated": true
+                  }
+                ],
+                "source_span": {
+                  "field": "body",
+                  "start_offset": 0,
+                  "end_offset": 3,
+                  "quoted_text": "示例讯",
+                  "paragraph_index": 0,
+                  "article_version": 1
+                }
+              }
+            ],
+            "degradation_notice": null,
+            "failure_code": null,
+            "created_at": "2026-09-01T00:00:00.000Z",
+            "updated_at": "2026-09-01T00:00:00.000Z",
+            "expires_at": "2026-09-02T00:00:00.000Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "ignore_finding",
+      "request": {
+        "method": "PATCH",
+        "path": "/api/v1/reviews/rev_fixture_success/findings/fnd_success_001",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "aaaaaaaa-1111-4111-8111-111111111111"
+        },
+        "body": {
+          "action": "ignore",
+          "expected_article_version": 1,
+          "action_id": "act_success_001"
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_success_patch",
+          "review": {
+            "review_id": "rev_fixture_success",
+            "status": "succeeded",
+            "article": {
+              "title": "示例单位召开示例工作会议",
+              "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+              "version": 1
+            },
+            "findings": [
+              {
+                "finding_id": "fnd_success_001",
+                "type": "basic_text",
+                "severity": "low",
+                "title": "示例用词需人工确认",
+                "reason": "fixture 成功路径的示例标注，不代表真实审校结论。",
+                "status": "ignored",
+                "suggestion": { "text": "请人工确认该表述。", "replacement": null },
+                "confidence": 0.5,
+                "evidence": [
+                  {
+                    "kind": "rule",
+                    "excerpt": "示例讯",
+                    "citation_validated": true
+                  }
+                ],
+                "source_span": {
+                  "field": "body",
+                  "start_offset": 0,
+                  "end_offset": 3,
+                  "quoted_text": "示例讯",
+                  "paragraph_index": 0,
+                  "article_version": 1
+                }
+              }
+            ],
+            "degradation_notice": null,
+            "failure_code": null,
+            "created_at": "2026-09-01T00:00:00.000Z",
+            "updated_at": "2026-09-01T00:00:00.000Z",
+            "expires_at": "2026-09-02T00:00:00.000Z"
+          }
+        }
+      }
+    }
+  ]
+}

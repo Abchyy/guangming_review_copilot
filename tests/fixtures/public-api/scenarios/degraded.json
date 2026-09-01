@@ -1,0 +1,70 @@
+{
+  "id": "degraded",
+  "title": "模型未完成时降级为规则检查",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "note": "Degraded fixture must keep the frozen degradation_notice. It must not be presented as '没有问题'.",
+  "steps": [
+    {
+      "name": "create",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "22222222-2222-4222-8222-222222222222"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_degraded_create",
+          "review_id": "rev_fixture_degraded",
+          "status": "queued",
+          "poll_after_ms": 1000,
+          "expires_at": "2026-09-02T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "get_degraded",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/reviews/rev_fixture_degraded",
+        "headers": {
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 200,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_degraded_get",
+          "review": {
+            "review_id": "rev_fixture_degraded",
+            "status": "degraded",
+            "article": {
+              "title": "示例单位召开示例工作会议",
+              "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+              "version": 1
+            },
+            "findings": [],
+            "degradation_notice": "模型审校未完成，本轮仅完成规则检查，不能视为稿件没有问题。",
+            "failure_code": null,
+            "created_at": "2026-09-01T00:00:00.000Z",
+            "updated_at": "2026-09-01T00:00:00.000Z",
+            "expires_at": "2026-09-02T00:00:00.000Z"
+          }
+        }
+      }
+    }
+  ]
+}

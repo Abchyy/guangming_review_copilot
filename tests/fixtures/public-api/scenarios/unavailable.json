@@ -1,0 +1,70 @@
+{
+  "id": "unavailable",
+  "title": "容量耗尽或上游不可用",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "steps": [
+    {
+      "name": "capacity_exhausted",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json",
+          "retry-after": "120"
+        },
+        "body": {
+          "request_id": "req_capacity_exhausted",
+          "error": {
+            "code": "REVIEW_CAPACITY_EXHAUSTED",
+            "message": "审校服务繁忙，请稍后重试。"
+          }
+        }
+      }
+    },
+    {
+      "name": "upstream_unavailable",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 503,
+        "headers": {
+          "content-type": "application/json",
+          "retry-after": "60"
+        },
+        "body": {
+          "request_id": "req_upstream_unavailable",
+          "error": {
+            "code": "UPSTREAM_UNAVAILABLE",
+            "message": "审校暂时不可用，请稍后重试。"
+          }
+        }
+      }
+    }
+  ]
+}

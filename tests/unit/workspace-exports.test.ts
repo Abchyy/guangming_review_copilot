@@ -56,4 +56,12 @@ describe("workspace package exports", () => {
     ) as { name: string };
     expect(pkg.name).toBe("@grc/web");
   });
+
+  test("miniprogram fixture app is a workspace package", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(root, "apps/miniprogram/package.json"), "utf8"),
+    ) as { name: string };
+    expect(pkg.name).toBe("@review/miniprogram");
+    expect(existsSync(join(root, "apps/miniprogram/app.json"))).toBe(true);
+  });
 });

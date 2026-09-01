@@ -1,0 +1,452 @@
+{
+  "product_working_name": "AI 审校助手",
+  "baseline_sha": "7af7a05fb05dd26aa6347fc1d1c9094e45836077",
+  "phase": "fixture_development",
+  "disclaimer": "Fixture replay and static checks are not a live WeChat path. 开发版或体验版二维码不能证明“任何人扫码即可使用”。只有正式审核通过后的正式版小程序码，经未加入开发者或体验成员名单的微信账号完成闭环，才能声称公众可用。",
+  "evidence_classes": {
+    "FIXTURE_VERIFIED": "Automated replay of recorded API v0 fixtures passed. Not a deployed system.",
+    "STATIC_CHECK": "Files, docs, or scanners were inspected. No live system was exercised.",
+    "NOT_VERIFIED": "No evidence has been produced yet.",
+    "BLOCKED_EXTERNAL": "Cannot be verified until AppID, domain, legal entity, or WeChat review is available."
+  },
+  "lanes": [
+    {
+      "id": "fixture_development",
+      "title": "Fixture 开发 Gate",
+      "items": [
+        {
+          "id": "FIX-CATALOG",
+          "item": "API v0 fixture catalog loads",
+          "criteria": "catalog.json lists every required scenario and all files parse.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts",
+          "expected_evidence": "Vitest PASS; 14 required scenarios loaded.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-SUCCESS",
+          "item": "成功路径",
+          "criteria": "POST /api/v1/reviews → 202 queued; GET → succeeded; finding PATCH succeeds; every JSON body has request_id.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t success",
+          "expected_evidence": "HTTP replay matches recorded 200/202 envelopes.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-DEGRADED",
+          "item": "降级路径",
+          "criteria": "GET status=degraded uses the frozen degradation_notice. Must not present as 没有问题.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t degraded",
+          "expected_evidence": "Caution string exact match.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-FAILED",
+          "item": "失败路径",
+          "criteria": "GET status=failed includes a frozen error code and does not claim 没有问题.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t failed",
+          "expected_evidence": "Failed envelope with UPSTREAM_UNAVAILABLE.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-UNAUTH",
+          "item": "未认证",
+          "criteria": "Missing or invalid bearer returns 401 AUTH_REQUIRED.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t unauthenticated",
+          "expected_evidence": "401 envelopes for create/get/delete/invalid token.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-FORBIDDEN",
+          "item": "越权 / 所有权隔离",
+          "criteria": "Owner B cannot GET/PATCH/DELETE owner A's review_id. Authenticated non-owners receive 404 REVIEW_NOT_FOUND.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t forbidden",
+          "expected_evidence": "404 REVIEW_NOT_FOUND for B; 200 for A.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-IDEMPOTENT-RETRY",
+          "item": "幂等重试",
+          "criteria": "Same Idempotency-Key and body reuse the same review_id. Declared quota/model deduction is 1, not a deployed meter.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t idempotent-retry",
+          "expected_evidence": "Two 202 responses share review_id.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-IDEMPOTENT-CONFLICT",
+          "item": "幂等冲突",
+          "criteria": "Same Idempotency-Key with a different body returns 409 IDEMPOTENCY_CONFLICT.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t idempotent-conflict",
+          "expected_evidence": "409 IDEMPOTENCY_CONFLICT.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-INVALID",
+          "item": "非法输入",
+          "criteria": "Missing privacy version, client-supplied user_id, and wrong types return 400 INVALID_REQUEST. Stale privacy version returns 400 PRIVACY_NOTICE_OUTDATED.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t invalid-request",
+          "expected_evidence": "400 envelopes.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-TOO-LARGE",
+          "item": "超长输入",
+          "criteria": "Title > 200 or body > 10000 UTF-16 code units returns 413 ARTICLE_TOO_LARGE.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t article-too-large",
+          "expected_evidence": "413 envelopes using Public API v0 limits 200/10000.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-CONTENT-REJECTED",
+          "item": "内容拒绝",
+          "criteria": "Content-safety rejection returns 422 CONTENT_REJECTED.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t content-rejected",
+          "expected_evidence": "422 envelope using a synthetic marker, not real prohibited content.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-QUOTA",
+          "item": "日配额",
+          "criteria": "Over daily_limit returns 429 DAILY_QUOTA_EXCEEDED.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t daily-quota-exceeded",
+          "expected_evidence": "429 envelope. Not a live quota store.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-RATE-LIMIT",
+          "item": "限流",
+          "criteria": "Burst traffic returns 429 RATE_LIMITED.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t rate-limited",
+          "expected_evidence": "429 envelope. Not a live rate limiter.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-DELETE-CONTRACT",
+          "item": "删除语义（契约 fixture）",
+          "criteria": "Owner DELETE → 204; subsequent GET → 404 REVIEW_NOT_FOUND; repeat DELETE → 204.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t delete",
+          "expected_evidence": "Recorded 204/404/204 sequence. Does not prove a deleter is deployed.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-UNAVAILABLE",
+          "item": "服务不可用",
+          "criteria": "503 REVIEW_CAPACITY_EXHAUSTED and UPSTREAM_UNAVAILABLE are stable and leak-free.",
+          "verification": "npx vitest run tests/public-release/api-v0-scenarios.test.ts -t unavailable",
+          "expected_evidence": "Two 503 envelopes.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-STATUS-ENUM",
+          "item": "状态枚举",
+          "criteria": "queued, running, succeeded, degraded, failed, cancelled, expired are all represented.",
+          "verification": "npx vitest run tests/public-release/contract-consistency.test.ts -t status",
+          "expected_evidence": "status-examples.json covers the frozen enum.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-ERROR-CODES",
+          "item": "稳定错误码",
+          "criteria": "Each frozen code maps to its HTTP status and has a leak-free example.",
+          "verification": "npx vitest run tests/public-release/contract-consistency.test.ts -t error",
+          "expected_evidence": "error-examples.json matches api-v0.json.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-TTL-DECLARED",
+          "item": "TTL 声明",
+          "criteria": "Fixtures declare 24h retention via expires_at. This is a declaration, not a deployed cleaner.",
+          "verification": "npx vitest run tests/public-release/contract-consistency.test.ts -t TTL",
+          "expected_evidence": "Declared 24h. deployment_status remains NOT_VERIFIED.",
+          "status": "STATIC_CHECK",
+          "blockers": []
+        },
+        {
+          "id": "FIX-TTL-DEPLOYED",
+          "item": "TTL 清理已部署",
+          "criteria": "A scheduled cleaner deletes reviews, findings, actions, jobs and excerpt caches after 24h, with monitoring.",
+          "verification": "Not runnable in this worktree. Requires Backend PostgreSQL + worker in integration.",
+          "expected_evidence": "Job logs, deleted-row counts, alert on failure.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["TTL job not integrated or deployed"]
+        },
+        {
+          "id": "FIX-DELETE-DEPLOYED",
+          "item": "删除已部署",
+          "criteria": "Production DELETE removes article/findings/actions/job payload and excerpt caches; audit keeps only event metadata.",
+          "verification": "Not runnable in this worktree.",
+          "expected_evidence": "DB before/after, audit row without manuscript text.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Delete path not integrated or deployed"]
+        },
+        {
+          "id": "FIX-LOG-POLICY-DEPLOYED",
+          "item": "生产日志策略已部署",
+          "criteria": "Runtime logs contain only allowed IDs/status/usage fields; no bearer, OpenID, or manuscript.",
+          "verification": "Not runnable in this worktree. Sample format is scanned separately.",
+          "expected_evidence": "Staging/production log export with redaction proof.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Production logger not integrated or deployed"]
+        },
+        {
+          "id": "FIX-SECRET-SCAN",
+          "item": "仓库无真实密钥",
+          "criteria": "Scanner finds no PEM, cloud keys, or live provider secrets. Test canaries in existing tests/api remain allowed.",
+          "verification": "node scripts/public-release/scan-sensitive.mjs",
+          "expected_evidence": "PUBLIC_RELEASE_SCAN: PASS",
+          "status": "STATIC_CHECK",
+          "blockers": []
+        },
+        {
+          "id": "FIX-LOG-SAMPLE",
+          "item": "日志样本脱敏",
+          "criteria": "tests/fixtures/public-api/logs/safe-sample.jsonl has no bearer token, OpenID, or full manuscript.",
+          "verification": "npx vitest run tests/public-release/security-scan.test.ts",
+          "expected_evidence": "Log sample scan PASS. Format fixture only.",
+          "status": "STATIC_CHECK",
+          "blockers": []
+        },
+        {
+          "id": "FIX-ERROR-LEAK",
+          "item": "错误输出不泄漏内部信息",
+          "criteria": "Error envelopes have no stack, SQL, upstream payload, or provider credentials.",
+          "verification": "npx vitest run tests/public-release/security-scan.test.ts",
+          "expected_evidence": "Error payload scan PASS.",
+          "status": "FIXTURE_VERIFIED",
+          "blockers": []
+        },
+        {
+          "id": "FIX-NO-LIVE-WECHAT-CLAIM",
+          "item": "禁止把 fixture 写成微信通过",
+          "criteria": "No fixture-lane item may be labeled as WeChat review pass or public QR pass.",
+          "verification": "npx vitest run tests/public-release/gate-matrix.test.ts",
+          "expected_evidence": "Matrix statuses stay in the allowed vocabulary; official items remain NOT_VERIFIED/BLOCKED_EXTERNAL.",
+          "status": "STATIC_CHECK",
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "title": "集成环境 Gate",
+      "items": [
+        {
+          "id": "INT-TYPECHECK",
+          "item": "typecheck",
+          "criteria": "npm run typecheck passes on the integrated tree.",
+          "verification": "npm run typecheck",
+          "expected_evidence": "tsc --noEmit exit 0 on integration/public-v1 after backend and miniprogram merge.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Integration lane has not absorbed backend/miniprogram"]
+        },
+        {
+          "id": "INT-LINT",
+          "item": "lint",
+          "criteria": "npm run lint passes.",
+          "verification": "npm run lint",
+          "expected_evidence": "eslint exit 0.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Integration not started"]
+        },
+        {
+          "id": "INT-FULL-TEST",
+          "item": "完整离线测试",
+          "criteria": "npm test passes, including these public-release tests.",
+          "verification": "npm test (root offline vitest run)",
+          "expected_evidence": "Vitest run exit 0 on the integrated tree.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Integration not started"]
+        },
+        {
+          "id": "INT-WEB-BUILD",
+          "item": "Web production build",
+          "criteria": "Existing Web Demo still builds.",
+          "verification": "npm run build",
+          "expected_evidence": "Next.js production build exit 0.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Not re-run in this lane after fixture work"]
+        },
+        {
+          "id": "INT-MP-BUILD",
+          "item": "小程序构建",
+          "criteria": "apps/miniprogram builds in WeChat DevTools or CI equivalent.",
+          "verification": "Miniprogram build command owned by Mini Program / Integration writers.",
+          "expected_evidence": "WeChat DevTools or CI build log from the miniprogram feature worktree after integration.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Miniprogram client exists in its feature worktree but is not integrated here"]
+        },
+        {
+          "id": "INT-API-WORKER-PG",
+          "item": "API + Worker + PostgreSQL smoke",
+          "criteria": "Staging-like processes accept a fixture article, poll to terminal status, and delete.",
+          "verification": "Integration smoke against loopback, never WeChat production.",
+          "expected_evidence": "Request IDs, job rows, delete 204.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["Public API fixture slice exists in backend worktree but is not integrated or deployed"]
+        },
+        {
+          "id": "INT-LIVE-BLACKBOX",
+          "item": "指向集成 API 的黑盒回放",
+          "criteria": "Same fixtures replay against PUBLIC_API_BASE_URL in the integration lane only.",
+          "verification": "Integration-owned env. This lane refuses PUBLIC_API_BASE_URL.",
+          "expected_evidence": "Black-box PASS against staging, still not a WeChat proof.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["No staging Public API"]
+        },
+        {
+          "id": "INT-ROLLBACK",
+          "item": "发布/回滚清单演练",
+          "criteria": "Documented rollback is executed once in staging.",
+          "verification": "Integration runbook.",
+          "expected_evidence": "Rollback log with timestamps.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["No staging deploy"]
+        }
+      ]
+    },
+    {
+      "id": "wechat_preview",
+      "title": "微信开发版 / 体验版 Gate",
+      "items": [
+        {
+          "id": "WX-DEV-QR",
+          "item": "开发版二维码",
+          "criteria": "A developer-list account can open the 开发版. This does not prove public access.",
+          "verification": "WeChat DevTools upload + developer-list scan.",
+          "expected_evidence": "Screenshot of 开发版. Must be labeled NOT public.",
+          "status": "BLOCKED_EXTERNAL",
+          "blockers": ["AppID TBD", "No WeChat upload authorized"]
+        },
+        {
+          "id": "WX-TRIAL-QR",
+          "item": "体验版二维码",
+          "criteria": "An experience-member account can open the 体验版. This does not prove public access.",
+          "verification": "WeChat admin experience-member scan.",
+          "expected_evidence": "Screenshot of 体验版. Must be labeled NOT public.",
+          "status": "BLOCKED_EXTERNAL",
+          "blockers": ["AppID TBD", "Experience members TBD"]
+        },
+        {
+          "id": "WX-LOGIN",
+          "item": "wx.login / code2Session",
+          "criteria": "Real jscode2session issues an opaque session. OpenID never returns to the client.",
+          "verification": "Staging with real AppID, still not production publish.",
+          "expected_evidence": "Server logs with hashed subject, no OpenID in client payload.",
+          "status": "BLOCKED_EXTERNAL",
+          "blockers": ["AppID TBD", "AppSecret TBD", "Real WeChat calls forbidden in this lane"]
+        },
+        {
+          "id": "WX-DOMAIN",
+          "item": "服务器域名与业务域名",
+          "criteria": "HTTPS API domain is allowlisted. Turning off domain verification is not evidence.",
+          "verification": "WeChat admin console + TLS probe.",
+          "expected_evidence": "Domain list screenshot and curl --noproxy TLS 200.",
+          "status": "BLOCKED_EXTERNAL",
+          "blockers": ["HTTPS business domain TBD"]
+        },
+        {
+          "id": "WX-DEV-NOT-PUBLIC",
+          "item": "开发版/体验版不得当作公开发布",
+          "criteria": "Release notes must state that 开发版 or 体验版 QR codes cannot prove 任何人扫码即可使用.",
+          "verification": "npx vitest run tests/public-release/gate-matrix.test.ts",
+          "expected_evidence": "This document contains the disclaimer. Item remains a process control.",
+          "status": "STATIC_CHECK",
+          "blockers": []
+        }
+      ]
+    },
+    {
+      "id": "official_release",
+      "title": "正式审核和正式二维码 Gate",
+      "items": [
+        {
+          "id": "OFF-ENTITY",
+          "item": "运营主体",
+          "criteria": "Legal entity name, type, and WeChat verification match the submitted miniprogram.",
+          "verification": "WeChat admin + business license. Do not fabricate.",
+          "expected_evidence": "Admin screenshot of verified entity. Currently TBD.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["运营主体 TBD"]
+        },
+        {
+          "id": "OFF-ICP-FILING",
+          "item": "小程序备案",
+          "criteria": "Miniprogram filing is complete for the operating entity.",
+          "verification": "WeChat filing status page.",
+          "expected_evidence": "Filing number. Currently TBD.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["小程序备案 TBD"]
+        },
+        {
+          "id": "OFF-APPID",
+          "item": "正式 AppID",
+          "criteria": "Release uses the production AppID, not a test/demo id and not a fixture token.",
+          "verification": "WeChat admin AppID compared to production config.",
+          "expected_evidence": "AppID recorded by operator, never committed as a secret companion AppSecret.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["正式 AppID TBD"]
+        },
+        {
+          "id": "OFF-HTTPS-DOMAIN",
+          "item": "HTTPS 业务域名",
+          "criteria": "Public API is served on a filed HTTPS domain reachable in mainland China.",
+          "verification": "TLS certificate, ICP, WeChat domain list.",
+          "expected_evidence": "Domain + certificate expiry + ICP number.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["HTTPS 业务域名 TBD"]
+        },
+        {
+          "id": "OFF-PRIVACY-GUIDE",
+          "item": "隐私保护指引",
+          "criteria": "WeChat privacy guide and in-app notice match actual data flow: wx.login only, 24h retention, no phone number.",
+          "verification": "WeChat privacy-guide UI + product copy review.",
+          "expected_evidence": "Submitted guide text and screenshot.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["隐私保护指引 TBD"]
+        },
+        {
+          "id": "OFF-GENERATIVE-AI",
+          "item": "生成式 AI / 平台合规",
+          "criteria": "Generative-AI filing, algorithm filing, security assessment and news-license boundary are confirmed by the operating entity. This repo is not legal advice.",
+          "verification": "Operator-supplied certificates. Do not invent filing numbers.",
+          "expected_evidence": "Filing IDs or a written out-of-scope conclusion.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["生成式 AI 或相关平台合规要求 TBD"]
+        },
+        {
+          "id": "OFF-WECHAT-REVIEW",
+          "item": "微信审核",
+          "criteria": "WeChat review status is 审核通过 for the production release.",
+          "verification": "WeChat admin review history. This lane must not submit.",
+          "expected_evidence": "Review-pass screenshot and timestamp.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["微信审核 not submitted and not authorized"]
+        },
+        {
+          "id": "OFF-STRANGER-QR",
+          "item": "正式版二维码陌生账号测试",
+          "criteria": "A WeChat account that is not a developer or experience member scans the official miniprogram code and completes one review within quota.",
+          "verification": "Manual test after WeChat publish. 开发版/体验版 QR is insufficient.",
+          "expected_evidence": "Video or screenshot from the stranger account on the official QR.",
+          "status": "NOT_VERIFIED",
+          "blockers": ["正式发布 has not happened"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "id": "delete",
+  "title": "owner 删除后 GET 为 404，重复 DELETE 为 204",
+  "evidence_class": "FIXTURE_VERIFIED",
+  "deployment_status": "NOT_VERIFIED",
+  "note": "Fixture records delete semantics. It does not prove a production deleter, TTL job, or audit pipeline is deployed.",
+  "steps": [
+    {
+      "name": "create_running",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/reviews",
+        "headers": {
+          "content-type": "application/json",
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "dddddddd-dddd-4ddd-8ddd-ddddddddddd1"
+        },
+        "body": {
+          "title": "示例单位召开示例工作会议",
+          "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+          "privacy_notice_version": "public-v1"
+        }
+      },
+      "response": {
+        "status": 202,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_delete_create",
+          "review_id": "rev_fixture_delete",
+          "status": "queued",
+          "poll_after_ms": 1000,
+          "expires_at": "2026-09-02T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "name": "get_running",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/reviews/rev_fixture_delete",
+        "headers": {
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 200,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_delete_get_running",
+          "review": {
+            "review_id": "rev_fixture_delete",
+            "status": "running",
+            "article": {
+              "title": "示例单位召开示例工作会议",
+              "body": "示例讯。示例单位近日召开示例工作会议，会议强调要把示例工作抓紧抓好。与会人员表示将对照示例要求抓好落实。",
+              "version": 1
+            },
+            "findings": [],
+            "degradation_notice": null,
+            "failure_code": null,
+            "created_at": "2026-09-01T00:00:00.000Z",
+            "updated_at": "2026-09-01T00:00:00.000Z",
+            "expires_at": "2026-09-02T00:00:00.000Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "delete",
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/reviews/rev_fixture_delete",
+        "headers": {
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "dddddddd-dddd-4ddd-8ddd-ddddddddddd2"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 204,
+        "headers": {},
+        "body": null
+      }
+    },
+    {
+      "name": "get_after_delete",
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/reviews/rev_fixture_delete",
+        "headers": {
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 404,
+        "headers": { "content-type": "application/json" },
+        "body": {
+          "request_id": "req_delete_get_missing",
+          "error": {
+            "code": "REVIEW_NOT_FOUND",
+            "message": "审校不存在或已删除。"
+          }
+        }
+      }
+    },
+    {
+      "name": "delete_again",
+      "request": {
+        "method": "DELETE",
+        "path": "/api/v1/reviews/rev_fixture_delete",
+        "headers": {
+          "authorization": "Bearer sess_fixture_owner_a_0000000000001",
+          "idempotency-key": "dddddddd-dddd-4ddd-8ddd-ddddddddddd3"
+        },
+        "body": null
+      },
+      "response": {
+        "status": 204,
+        "headers": {},
+        "body": null
+      }
+    }
+  ]
+}

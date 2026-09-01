@@ -66,15 +66,18 @@
   },
   "include": [
     "next-env.d.ts",
+    "apps/web/next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "apps/web/.next/types/**/*.ts",
+    "apps/web/.next/dev/types/**/*.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
   "exclude": [
     "node_modules",
-    "apps/web/.next",
+    "apps/miniprogram",
     ".next",
     "src",
     "src/**/*"
