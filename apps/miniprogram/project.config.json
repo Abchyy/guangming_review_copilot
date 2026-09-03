@@ -4,8 +4,10 @@
   "projectname": "ai-review-assistant",
   "setting": {
     "es6": true,
+    "enhance": true,
     "minified": true,
-    "postcss": true
+    "postcss": true,
+    "useCompilerPlugins": ["typescript"]
   },
   "packOptions": {
     "ignore": [

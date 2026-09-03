@@ -14,14 +14,26 @@ describe("miniprogram page manifest", () => {
     };
     assert.equal(appJson.window.navigationBarTitleText, "AI 审校助手");
     assert.ok(appJson.pages.length > 0);
+    assert.ok(existsSync(join(root, "app.ts")), "missing app.ts");
+    assert.equal(existsSync(join(root, "app.js")), false, "handwritten app.js must not exist");
     for (const page of appJson.pages) {
       assert.ok(existsSync(join(root, `${page}.wxml`)), `missing ${page}.wxml`);
       assert.ok(existsSync(join(root, `${page}.json`)), `missing ${page}.json`);
-      assert.ok(
-        existsSync(join(root, `${page}.ts`)) || existsSync(join(root, `${page}.js`)),
-        `missing ${page} script`,
+      assert.ok(existsSync(join(root, `${page}.ts`)), `missing ${page}.ts`);
+      assert.equal(
+        existsSync(join(root, `${page}.js`)),
+        false,
+        `handwritten ${page}.js must not exist; WeChat DevTools compiles the .ts source`,
       );
     }
+  });
+
+  it("enables WeChat DevTools TypeScript compilation", () => {
+    const project = JSON.parse(readFileSync(join(root, "project.config.json"), "utf8")) as {
+      setting?: { enhance?: boolean; useCompilerPlugins?: unknown };
+    };
+    assert.equal(project.setting?.enhance, true);
+    assert.deepEqual(project.setting?.useCompilerPlugins, ["typescript"]);
   });
 
   it("does not embed a real AppID or production domain", () => {

@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+project.private.config.json
 
 # debug
 npm-debug.log*
