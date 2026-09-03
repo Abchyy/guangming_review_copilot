@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { SAMPLE_ARTICLE } from "../fixtures/sample-article";
 import { DEGRADED_CAUTION } from "../services/contract";
 import { FixtureReviewClient, type FixtureScenario } from "../services/fixture-client";
+import { ApiError, type ReviewClient } from "../services/types";
 import { ReviewSession } from "../session/review-session";
 
 async function run(
@@ -41,6 +42,7 @@ describe("fixture happy path", () => {
     assert.equal(view.cautionVisible, false);
     assert.equal(view.findings.length, 1);
     assert.equal(view.findings[0]?.title, "存在冗余助词");
+    assert.equal(view.remainingLabel, "2 / 3");
     assert.ok(phases.includes("progress"));
     assert.match(session.getReview()?.status ?? "", /succeeded/);
 
@@ -60,8 +62,51 @@ describe("fixture happy path", () => {
     assert.equal(reset.findings.length, 0);
     assert.equal(reset.sheetVisible, false);
     assert.equal(reset.errorVisible, false);
+    assert.equal(reset.title, "");
+    assert.equal(reset.body, "");
+    assert.equal(reset.privacyChecked, false);
+    assert.equal(reset.canSubmit, false);
+    assert.equal(reset.remainingLabel, "2 / 3");
+    assert.match(reset.quotaText, /今日剩余 2 \/ 3 篇/);
     assert.equal(session.getReview(), null);
     assert.equal(client.getStored(reviewId), null);
+    assert.equal((await client.login()).remaining, 2);
+  });
+
+  it("keeps the draft and results when delete fails", async () => {
+    const inner = new FixtureReviewClient("success");
+    const client: ReviewClient = {
+      login: () => inner.login(),
+      createReview: (input) => inner.createReview(input),
+      getReview: (reviewId) => inner.getReview(reviewId),
+      decide: (reviewId, findingId, input) => inner.decide(reviewId, findingId, input),
+      deleteReview: async () => {
+        throw new ApiError(503, "UPSTREAM_UNAVAILABLE", "Fixture delete failure");
+      },
+    };
+    const session = new ReviewSession({
+      client,
+      allowSample: true,
+      sleep: async () => undefined,
+    });
+    session.fillSample();
+    session.setPrivacyChecked(true);
+    await session.submit();
+    session.selectFinding("fixture-finding-1");
+    const before = session.toViewModel();
+
+    await session.deleteAndReset();
+    const after = session.toViewModel();
+    assert.equal(after.phase, "result");
+    assert.equal(after.title, before.title);
+    assert.equal(after.body, before.body);
+    assert.equal(after.privacyChecked, true);
+    assert.equal(after.hasReview, true);
+    assert.equal(after.findings.length, 1);
+    assert.equal(after.selectedFinding?.finding_id, "fixture-finding-1");
+    assert.equal(after.errorCode, "UPSTREAM_UNAVAILABLE");
+    assert.equal(after.remainingLabel, "2 / 3");
+    assert.ok(session.getReview());
   });
 });
 

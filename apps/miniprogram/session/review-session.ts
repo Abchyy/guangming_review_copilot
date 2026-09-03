@@ -157,6 +157,11 @@ export class ReviewSession {
     return this.phase;
   }
 
+  setLocalError(message: string, code = "UI_ERROR"): void {
+    this.error = { code, message };
+    this.emit();
+  }
+
   toViewModel(): ReviewViewModel {
     const inputError = validateReviewInput(this.title, this.body);
     const presentation = this.review ? resultPresentation(this.review) : null;
@@ -280,6 +285,7 @@ export class ReviewSession {
       if (token !== this.generation) {
         return;
       }
+      this.consumeDailyQuota();
       this.pollAfterMs = created.poll_after_ms || PUBLIC_DEFAULT_POLL_AFTER_MS;
       this.review = {
         review_id: created.review_id,
@@ -361,7 +367,7 @@ export class ReviewSession {
       if (token !== this.generation) {
         return;
       }
-      this.resetLocalState();
+      this.clearDraftAfterDelete();
     } catch (error) {
       if (token !== this.generation) {
         return;
@@ -385,6 +391,24 @@ export class ReviewSession {
     this.error = null;
     this.pollAfterMs = PUBLIC_DEFAULT_POLL_AFTER_MS;
     this.emit();
+  }
+
+  private consumeDailyQuota(): void {
+    if (!this.login) {
+      return;
+    }
+    this.login.remaining = Math.max(0, this.login.remaining - 1);
+  }
+
+  private clearDraftAfterDelete(): void {
+    this.phase = "input";
+    this.review = null;
+    this.selectedFindingId = null;
+    this.error = null;
+    this.pollAfterMs = PUBLIC_DEFAULT_POLL_AFTER_MS;
+    this.title = "";
+    this.body = "";
+    this.privacyChecked = false;
   }
 
   private async pollUntilTerminal(reviewId: string, token: number): Promise<void> {

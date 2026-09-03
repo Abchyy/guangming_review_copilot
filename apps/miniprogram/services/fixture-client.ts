@@ -127,9 +127,11 @@ export class FixtureReviewClient implements ReviewClient {
   private scenario: FixtureScenario;
   private readonly reviews = new Map<string, StoredReview>();
   private sequence = 0;
+  private remaining: number;
 
   constructor(scenario: FixtureScenario = "success") {
     this.scenario = scenario;
+    this.remaining = scenario === "quota" ? 0 : PUBLIC_DEFAULT_DAILY_LIMIT;
   }
 
   setScenario(scenario: FixtureScenario): void {
@@ -144,7 +146,7 @@ export class FixtureReviewClient implements ReviewClient {
       request_id: "fixture-login-request",
       expires_at: iso(60 * 60 * 1000),
       daily_limit: PUBLIC_DEFAULT_DAILY_LIMIT,
-      remaining: this.scenario === "quota" ? 0 : PUBLIC_DEFAULT_DAILY_LIMIT,
+      remaining: this.remaining,
       running_limit: PUBLIC_DEFAULT_RUNNING_LIMIT,
     };
   }
@@ -166,6 +168,10 @@ export class FixtureReviewClient implements ReviewClient {
     if (isPublicArticleTooLarge(input.title, input.body)) {
       throw new ApiError(413, "ARTICLE_TOO_LARGE", "Fixture body is too large");
     }
+    if (this.remaining <= 0) {
+      throw new ApiError(429, "DAILY_QUOTA_EXCEEDED", "Fixture quota exhausted");
+    }
+    this.remaining -= 1;
     this.sequence += 1;
     const now = iso();
     const reviewId = `fixture-review-${this.sequence}`;

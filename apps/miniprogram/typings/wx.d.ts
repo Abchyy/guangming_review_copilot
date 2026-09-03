@@ -25,7 +25,8 @@ declare const wx: {
     cancelText?: string;
     confirmText?: string;
     confirmColor?: string;
-    success: (result: { confirm: boolean; cancel: boolean }) => void;
+    success?: (result: { confirm: boolean; cancel: boolean }) => void;
+    fail?: (error: { errMsg: string }) => void;
   }): void;
 };
 

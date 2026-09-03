@@ -55,7 +55,7 @@
     <view class="card-kicker">任务进度</view>
     <view class="status-title">{{progressTitle}}</view>
     <view class="status-detail">{{progressDetail}}</view>
-    <button wx:if="{{hasReview}}" class="ghost danger" bindtap="onDelete">取消并删除任务</button>
+    <button wx:if="{{hasReview}}" class="ghost danger" hover-class="none" catchtap="onDelete">取消并删除任务</button>
   </view>
 
   <view wx:if="{{phase === 'failure'}}" class="card status-card">
@@ -64,7 +64,7 @@
     <view class="status-detail">空结果、超时或上游异常都不能视为稿件没有问题。</view>
     <view class="actions">
       <button class="ghost" bindtap="onReset">返回修改</button>
-      <button class="ghost danger" bindtap="onDelete">删除任务</button>
+      <button class="ghost danger" hover-class="none" catchtap="onDelete">删除任务</button>
     </view>
   </view>
 
@@ -110,7 +110,7 @@
         <view class="finding-title">{{item.title}}</view>
         <view class="finding-reason">{{item.reason}}</view>
       </view>
-      <button class="ghost danger" bindtap="onDelete">删除本篇审校</button>
+      <button class="ghost danger" hover-class="none" catchtap="onDelete">删除本篇审校</button>
     </view>
   </view>
 
